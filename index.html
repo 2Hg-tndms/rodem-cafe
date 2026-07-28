@@ -345,6 +345,8 @@ let sheetQty = 1;
 let showCartDrawer = false;
 let stage = 'menu';     // menu | checkout | done
 let orderName = '';
+let cashPlanned = false;
+let couponPlanned = false;
 let lastOrder = null;
 let submitting = false;
 
@@ -498,6 +500,15 @@ function renderCheckout(){
       <div class="amount-big">${fmt(cartTotal())}원</div>
       <div style="text-align:center;font-size:12px;color:var(--ink-soft);">아래 카카오페이 계좌로 위 금액을 보내주세요</div>
 
+      <div class="shot-toggle ${cashPlanned?'active':''}" id="cashToggle" style="margin-top:14px;">
+        <span>현금 결제 예정</span>
+        <span class="shot-check">${cashPlanned?'✓':''}</span>
+      </div>
+      <div class="shot-toggle ${couponPlanned?'active':''}" id="couponToggle" style="margin-top:10px;">
+        <span>쿠폰 사용 예정</span>
+        <span class="shot-check">${couponPlanned?'✓':''}</span>
+      </div>
+
       <div class="pay-card">
         <img src="${QR_IMG}" alt="카카오페이 QR"/>
         <div class="account-box">
@@ -607,14 +618,17 @@ function attachHandlers(){
     copyBtn.textContent = '복사됨';
     setTimeout(()=>{ copyBtn.textContent='복사'; },1500);
   };
-  const backBtn = document.getElementById('backToCartBtn');
+  const cashToggle = document.getElementById('cashToggle');
+  if(cashToggle) cashToggle.onclick = ()=>{ cashPlanned = !cashPlanned; render(); };
+  const couponToggle = document.getElementById('couponToggle');
+  if(couponToggle) couponToggle.onclick = ()=>{ couponPlanned = !couponPlanned; render(); };
   if(backBtn) backBtn.onclick = ()=>{ stage='menu'; showCartDrawer=true; render(); };
   const confirmBtn = document.getElementById('confirmPayBtn');
   if(confirmBtn) confirmBtn.onclick = submitOrder;
 
   const newOrderBtn = document.getElementById('newOrderBtn');
   if(newOrderBtn) newOrderBtn.onclick = ()=>{
-    cart = []; orderName=''; stage='menu'; lastOrder=null; render();
+    cart = []; orderName=''; cashPlanned=false; couponPlanned=false; stage='menu'; lastOrder=null; render();
   };
 }
 
@@ -633,7 +647,9 @@ async function submitOrder(){
       body: JSON.stringify({
         name: orderName.trim(),
         items: cart.map(c=>({ name:c.name, temp:c.temp, shot:c.shot, price:c.price, qty:c.qty })),
-        total: cartTotal()
+        total: cartTotal(),
+        cash: cashPlanned,
+        coupon: couponPlanned
       })
     });
     if(!res.ok) throw new Error('bad response');
@@ -703,7 +719,7 @@ function renderCounter(){
         <div class="order-no">${o.number}번</div>
         <div class="order-time">${timeStr(o.createdAt)}</div>
       </div>
-      <div class="order-name">${o.name}님</div>
+      <div class="order-name">${o.name}님 ${o.cash?'<span style="color:var(--apricot-deep);font-weight:700;">· 현금결제 예정</span>':''} ${o.coupon?'<span style="color:var(--sage-deep);font-weight:700;">· 쿠폰 사용 예정</span>':''}</div>
       <div class="order-items">${o.items.map(it=>`${it.name}${optLabel(it.temp,it.shot)?' ('+optLabel(it.temp,it.shot)+')':''} ×${it.qty}`).join('<br/>')}</div>
       <div style="display:flex;justify-content:space-between;align-items:center;">
         <div class="order-total">${fmt(o.total)}원</div>
