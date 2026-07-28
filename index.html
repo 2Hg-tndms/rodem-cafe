@@ -622,6 +622,7 @@ function attachHandlers(){
   if(cashToggle) cashToggle.onclick = ()=>{ cashPlanned = !cashPlanned; render(); };
   const couponToggle = document.getElementById('couponToggle');
   if(couponToggle) couponToggle.onclick = ()=>{ couponPlanned = !couponPlanned; render(); };
+  const backBtn = document.getElementById('backToCartBtn');
   if(backBtn) backBtn.onclick = ()=>{ stage='menu'; showCartDrawer=true; render(); };
   const confirmBtn = document.getElementById('confirmPayBtn');
   if(confirmBtn) confirmBtn.onclick = submitOrder;
