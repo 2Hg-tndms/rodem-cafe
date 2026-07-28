@@ -26,10 +26,14 @@ exports.handler = async (event) => {
       if (!body.name || !Array.isArray(body.items) || body.items.length === 0) {
         return { statusCode: 400, headers, body: JSON.stringify({ error: 'invalid order' }) };
       }
-      const counterVal = await store.get('counter', { type: 'text' });
-      const n = (counterVal ? parseInt(counterVal, 10) : 0) + 1;
-      await store.set('counter', String(n));
-
+      const { blobs: existingBlobs } = await store.list({ prefix: 'order:' });
+      const usedNumbers = new Set();
+      for (const b of existingBlobs) {
+        const val = await store.get(b.key, { type: 'json' });
+        if (val && typeof val.number === 'number') usedNumbers.add(val.number);
+      }
+      let n = 1;
+      while (usedNumbers.has(n)) n++;
       const order = {
         id: uid(),
         number: n,
