@@ -663,7 +663,17 @@ async function loadOrders(){
   }catch(e){ counterOrders = []; }
   renderCounter();
 }
-
+async function deleteOrder(order){
+  if(!confirm(order.number+'번 주문을 삭제할까요? 되돌릴 수 없어요.')) return;
+  try{
+    await fetch(API, {
+      method: 'DELETE',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id: order.id })
+    });
+  }catch(_){}
+  loadOrders();
+}
 async function toggleStatus(order){
   const newStatus = order.status==='pending' ? 'done' : 'pending';
   order.status = newStatus;
@@ -698,6 +708,7 @@ function renderCounter(){
       <div style="display:flex;justify-content:space-between;align-items:center;">
         <div class="order-total">${fmt(o.total)}원</div>
         <button class="ghost-btn" style="width:auto;padding:8px 16px;" data-id="${o.id}">${o.status==='pending' ? '완료 처리' : '대기로 되돌리기'}</button>
+        ${o.status==='done' ? `<button class="ghost-btn" style="width:auto;padding:8px 16px;color:var(--danger);border-color:var(--danger);" data-delid="${o.id}">삭제</button>` : ''}
       </div>
     </div>
   `).join('') : `<div class="empty-state">${mascotSvg()}<div style="margin-top:10px;">해당하는 주문이 없어요</div></div>`;
@@ -723,6 +734,12 @@ function renderCounter(){
     b.onclick = ()=>{
       const o = counterOrders.find(x=>x.id===b.dataset.id);
       if(o) toggleStatus(o);
+    };
+  });
+  document.querySelectorAll('.order-card button[data-delid]').forEach(b=>{
+    b.onclick = ()=>{
+      const o = counterOrders.find(x=>x.id===b.dataset.delid);
+      if(o) deleteOrder(o);
     };
   });
 }
