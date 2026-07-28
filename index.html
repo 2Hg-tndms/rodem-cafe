@@ -644,8 +644,9 @@ async function submitOrder(){
     render();
   }catch(e){
     submitting = false;
-    alert('주문 접수 중 문제가 발생했어요. 다시 시도해주세요.');
+    alert('디버그: ' + e.message);
     render();
+  }
   }
 }
 
