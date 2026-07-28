@@ -56,4 +56,30 @@ exports.handler = async (event) => {
       if (!body.id) {
         return { statusCode: 400, headers, body: JSON.stringify({ error: 'missing id' }) };
       }
-      const existing = await store.get('order:' + body.id, { t
+      const existing = await store.get('order:' + body.id, { type: 'json' });
+      if (!existing) {
+        return { statusCode: 404, headers, body: JSON.stringify({ error: 'not found' }) };
+      }
+      existing.status = body.status;
+      await store.setJSON('order:' + body.id, existing);
+      return { statusCode: 200, headers, body: JSON.stringify({ order: existing }) };
+    }
+
+    if (event.httpMethod === 'DELETE') {
+      const body = JSON.parse(event.body || '{}');
+      if (!body.id) {
+        return { statusCode: 400, headers, body: JSON.stringify({ error: 'missing id' }) };
+      }
+      const existing = await store.get('order:' + body.id, { type: 'json' });
+      await store.delete('order:' + body.id);
+      if (existing && typeof existing.number === 'number') {
+        await store.delete('numlock:' + existing.number);
+      }
+      return { statusCode: 200, headers, body: JSON.stringify({ ok: true }) };
+    }
+
+    return { statusCode: 405, headers, body: JSON.stringify({ error: 'method not allowed' }) };
+  } catch (err) {
+    return { statusCode: 500, headers, body: JSON.stringify({ error: String(err && err.message || err) }) };
+  }
+};
