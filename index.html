@@ -762,10 +762,36 @@ function renderCounter(){
 }
 
 /* ===================== boot ===================== */
+const COUNTER_PASSWORD = 'juice';
+
 function boot(){
   if(location.hash === '#counter'){
-    loadOrders();
-    setInterval(loadOrders, 4000);
+    if(sessionStorage.getItem('counterAuth') === '1'){
+      loadOrders();
+      setInterval(loadOrders, 4000);
+      return;
+    }
+    const app = document.getElementById('app');
+    app.innerHTML = `
+      <div style="max-width:400px;margin:0 auto;padding:80px 24px;text-align:center;">
+        ${mascotSvg()}
+        <div style="font-family:'Jua',sans-serif;font-size:18px;margin-top:14px;">관리자 비밀번호</div>
+        <input type="password" id="counterPw" class="text-input" style="margin-top:16px;text-align:center;" placeholder="비밀번호 입력"/>
+        <button class="primary-btn" style="margin-top:14px;" id="counterPwBtn">확인</button>
+      </div>
+    `;
+    const check = ()=>{
+      const val = document.getElementById('counterPw').value;
+      if(val === COUNTER_PASSWORD){
+        sessionStorage.setItem('counterAuth','1');
+        loadOrders();
+        setInterval(loadOrders, 4000);
+      } else {
+        alert('비밀번호가 틀렸어요');
+      }
+    };
+    document.getElementById('counterPwBtn').onclick = check;
+    document.getElementById('counterPw').addEventListener('keydown', e=>{ if(e.key==='Enter') check(); });
   } else {
     render();
   }
