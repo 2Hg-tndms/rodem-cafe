@@ -57,6 +57,15 @@ exports.handler = async (event) => {
       return { statusCode: 200, headers, body: JSON.stringify({ order: existing }) };
     }
 
+    if (event.httpMethod === 'DELETE') {
+      const body = JSON.parse(event.body || '{}');
+      if (!body.id) {
+        return { statusCode: 400, headers, body: JSON.stringify({ error: 'missing id' }) };
+      }
+      await store.delete('order:' + body.id);
+      return { statusCode: 200, headers, body: JSON.stringify({ ok: true }) };
+    }
+
     return { statusCode: 405, headers, body: JSON.stringify({ error: 'method not allowed' }) };
   } catch (err) {
     return { statusCode: 500, headers, body: JSON.stringify({ error: String(err && err.message || err) }) };
