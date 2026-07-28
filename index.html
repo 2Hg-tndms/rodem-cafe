@@ -1,0 +1,740 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>로뎀카페</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Jua&family=Gowun+Dodum&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --cream:#FBF5E9;
+    --paper:#FFFEFA;
+    --ink:#221E19;
+    --ink-soft:#5C554A;
+    --line:#E2D8C2;
+    --sage:#7C8F63;
+    --sage-deep:#5E6E48;
+    --apricot:#EE9457;
+    --apricot-deep:#D97A3B;
+    --brown:#8B5A3C;
+    --danger:#C0503B;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  body{
+    background:var(--cream);
+    color:var(--ink);
+    font-family:'Gowun Dodum','Noto Sans KR',sans-serif;
+    -webkit-font-smoothing:antialiased;
+    min-height:100vh;
+  }
+  .display{font-family:'Jua','Gowun Dodum',sans-serif;}
+  #app{max-width:480px;margin:0 auto;min-height:100vh;position:relative;padding-bottom:96px;background:var(--cream);}
+
+  /* ---- header ---- */
+  .header{
+    position:sticky;top:0;z-index:30;
+    background:var(--cream);
+    padding:18px 18px 10px;
+    border-bottom:2px dashed var(--line);
+  }
+  .brand-row{display:flex;align-items:center;justify-content:center;gap:8px;}
+  .brand-title{font-size:30px;color:var(--ink);letter-spacing:1px;}
+  .brand-sub{text-align:center;font-size:12px;color:var(--ink-soft);margin-top:2px;letter-spacing:2px;}
+
+  .doodle-divider{width:100%;height:14px;margin:10px 0 2px;opacity:0.55;}
+
+  /* ---- category tabs ---- */
+  .tabs{display:flex;gap:8px;overflow-x:auto;padding:14px 16px 4px;scrollbar-width:none;}
+  .tabs::-webkit-scrollbar{display:none;}
+  .tab-btn{
+    flex:0 0 auto;
+    font-family:'Jua',sans-serif;
+    font-size:14px;
+    padding:8px 16px;
+    border-radius:999px;
+    border:2px solid var(--ink);
+    background:var(--paper);
+    color:var(--ink);
+    cursor:pointer;
+    white-space:nowrap;
+  }
+  .tab-btn.active{background:var(--ink);color:var(--cream);}
+
+  /* ---- menu list ---- */
+  .menu-list{padding:6px 16px 12px;}
+  .menu-card{
+    display:flex;justify-content:space-between;align-items:center;
+    background:var(--paper);
+    border:1.5px solid var(--line);
+    border-radius:16px;
+    padding:14px 16px;
+    margin-bottom:10px;
+    cursor:pointer;
+    transition:transform .08s ease;
+  }
+  .menu-card:active{transform:scale(0.98);}
+  .menu-name{font-size:16px;font-weight:700;color:var(--ink);}
+  .menu-en{font-size:11px;color:var(--ink-soft);margin-top:2px;}
+  .menu-price{font-family:'Jua',sans-serif;font-size:15px;color:var(--brown);text-align:right;white-space:nowrap;}
+  .menu-price small{font-size:10px;color:var(--ink-soft);display:block;font-family:'Gowun Dodum',sans-serif;}
+
+  .section-label{
+    font-family:'Jua',sans-serif;
+    font-size:13px;color:var(--sage-deep);
+    padding:14px 16px 2px;
+    display:flex;align-items:center;gap:6px;
+  }
+
+  /* ---- overlay / sheet ---- */
+  .overlay{
+    position:fixed;inset:0;background:rgba(34,30,25,0.45);
+    z-index:50;display:flex;align-items:flex-end;justify-content:center;
+  }
+  .overlay.center{align-items:center;}
+  .sheet{
+    width:100%;max-width:480px;background:var(--cream);
+    border-radius:24px 24px 0 0;
+    padding:20px 20px calc(20px + env(safe-area-inset-bottom));
+    max-height:88vh;overflow-y:auto;
+    animation:sheetUp .18s ease-out;
+  }
+  @keyframes sheetUp{from{transform:translateY(24px);opacity:0;}to{transform:translateY(0);opacity:1;}}
+  .sheet-handle{width:40px;height:4px;background:var(--line);border-radius:4px;margin:0 auto 14px;position:relative;cursor:grab;}
+  .sheet-handle::after{content:'';position:absolute;top:-16px;left:-220px;right:-220px;bottom:-16px;}
+
+  .opt-row{display:flex;gap:10px;margin:14px 0;}
+  .opt-btn{
+    flex:1;padding:14px 0;text-align:center;
+    border-radius:14px;border:2px solid var(--ink);
+    font-family:'Jua',sans-serif;font-size:15px;background:var(--paper);cursor:pointer;
+  }
+  .opt-btn.active{background:var(--apricot);border-color:var(--apricot-deep);color:#fff;}
+  .qty-row{display:flex;align-items:center;justify-content:center;gap:20px;margin:18px 0 22px;}
+  .qty-btn{
+    width:40px;height:40px;border-radius:50%;border:2px solid var(--ink);
+    background:var(--paper);font-size:20px;line-height:1;font-family:'Jua',sans-serif;cursor:pointer;
+    display:flex;align-items:center;justify-content:center;padding:0;flex:0 0 auto;
+    -webkit-tap-highlight-color:transparent;user-select:none;
+  }
+  .qty-num{font-family:'Jua',sans-serif;font-size:20px;min-width:26px;text-align:center;}
+  .shot-toggle{
+    display:flex;align-items:center;justify-content:space-between;
+    border:2px solid var(--ink);border-radius:14px;padding:12px 16px;margin-top:14px;cursor:pointer;
+  }
+  .shot-toggle.active{background:var(--sage);border-color:var(--sage-deep);color:#fff;}
+  .shot-check{
+    width:22px;height:22px;border-radius:6px;border:2px solid currentColor;
+    display:flex;align-items:center;justify-content:center;font-size:14px;flex:0 0 auto;
+  }
+
+  .primary-btn{
+    width:100%;padding:16px 0;border:none;border-radius:16px;
+    background:var(--ink);color:var(--cream);
+    font-family:'Jua',sans-serif;font-size:16px;cursor:pointer;
+  }
+  .primary-btn:disabled{opacity:0.4;}
+  .ghost-btn{
+    width:100%;padding:14px 0;border:2px solid var(--ink);border-radius:16px;
+    background:transparent;color:var(--ink);font-family:'Jua',sans-serif;font-size:15px;cursor:pointer;
+  }
+
+  /* ---- floating cart bar ---- */
+  .cart-bar{
+    position:fixed;bottom:18px;left:50%;transform:translateX(-50%);
+    width:calc(100% - 36px);max-width:444px;
+    background:var(--ink);color:var(--cream);
+    border-radius:18px;padding:14px 18px;
+    display:flex;justify-content:space-between;align-items:center;
+    cursor:pointer;z-index:20;box-shadow:0 8px 24px rgba(34,30,25,0.28);
+  }
+  .cart-bar-left{font-family:'Jua',sans-serif;font-size:14px;display:flex;align-items:center;gap:8px;}
+  .cart-badge{background:var(--apricot);color:#fff;border-radius:50%;width:22px;height:22px;display:flex;align-items:center;justify-content:center;font-size:12px;}
+  .cart-bar-right{font-family:'Jua',sans-serif;font-size:16px;}
+
+  /* ---- cart drawer ---- */
+  .cart-item{display:flex;justify-content:space-between;align-items:center;padding:12px 0;border-bottom:1px solid var(--line);}
+  .cart-item-name{font-size:14px;font-weight:700;}
+  .cart-item-opt{font-size:11px;color:var(--ink-soft);}
+  .cart-item-ctrl{display:flex;align-items:center;gap:10px;}
+  .mini-btn{
+    width:26px;height:26px;border-radius:50%;border:1.5px solid var(--ink);background:var(--paper);
+    font-size:15px;line-height:1;cursor:pointer;
+    display:flex;align-items:center;justify-content:center;padding:0;flex:0 0 auto;
+    -webkit-tap-highlight-color:transparent;user-select:none;
+  }
+  .remove-x{color:var(--danger);font-size:12px;margin-left:8px;cursor:pointer;text-decoration:underline;}
+
+  .total-row{display:flex;justify-content:space-between;align-items:center;padding:16px 0 4px;font-family:'Jua',sans-serif;font-size:18px;}
+
+  /* ---- checkout ---- */
+  .field-label{font-size:13px;color:var(--ink-soft);margin:4px 0 6px;}
+  .text-input{
+    width:100%;padding:13px 14px;border-radius:12px;border:1.5px solid var(--line);
+    font-family:'Gowun Dodum',sans-serif;font-size:15px;background:var(--paper);
+  }
+  .pay-card{
+    background:var(--paper);border:1.5px dashed var(--apricot-deep);
+    border-radius:18px;padding:18px;margin:16px 0;text-align:center;
+  }
+  .pay-card img{width:160px;border-radius:10px;margin-bottom:10px;border:1px solid var(--line);}
+  .account-box{
+    background:var(--cream);border-radius:12px;padding:10px 14px;margin-top:8px;
+    display:flex;justify-content:space-between;align-items:center;
+  }
+  .account-text{text-align:left;font-size:13px;}
+  .account-text b{font-family:'Jua',sans-serif;font-size:15px;display:block;}
+  .copy-btn{border:1.5px solid var(--ink);background:var(--paper);border-radius:8px;padding:6px 10px;font-size:12px;cursor:pointer;}
+
+  .amount-big{font-family:'Jua',sans-serif;font-size:30px;color:var(--apricot-deep);text-align:center;margin:6px 0 2px;}
+
+  /* ---- confirm / done ---- */
+  .done-wrap{padding:60px 24px;text-align:center;}
+  .order-num-badge{
+    display:inline-block;font-family:'Jua',sans-serif;font-size:44px;color:var(--ink);
+    background:var(--paper);border:3px solid var(--ink);border-radius:20px;padding:14px 30px;margin:18px 0;
+  }
+
+  /* ---- counter view ---- */
+  .counter-wrap{max-width:640px;margin:0 auto;padding:0 0 40px;}
+  .counter-header{
+    background:var(--ink);color:var(--cream);padding:20px 20px 16px;position:sticky;top:0;z-index:10;
+  }
+  .counter-tabs{display:flex;gap:8px;padding:14px 20px 0;}
+  .ctab{flex:1;text-align:center;padding:10px 0;border-radius:12px;font-family:'Jua',sans-serif;font-size:14px;border:2px solid var(--ink);cursor:pointer;background:var(--paper);}
+  .ctab.active{background:var(--ink);color:var(--cream);}
+  .order-card{
+    background:var(--paper);border:1.5px solid var(--line);border-radius:16px;
+    margin:12px 20px;padding:16px;
+  }
+  .order-card.done{opacity:0.55;}
+  .order-top{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;}
+  .order-no{font-family:'Jua',sans-serif;font-size:20px;}
+  .order-time{font-size:11px;color:var(--ink-soft);}
+  .order-name{font-size:13px;color:var(--ink-soft);margin-bottom:6px;}
+  .order-items{font-size:14px;line-height:1.7;margin-bottom:10px;}
+  .order-total{font-family:'Jua',sans-serif;font-size:16px;color:var(--brown);}
+  .empty-state{text-align:center;padding:60px 24px;color:var(--ink-soft);}
+</style>
+</head>
+<body>
+<div id="app"></div>
+
+<script>
+const QR_IMG = "/qr.jpg";
+const ACCOUNT = { bank: "카카오뱅크", number: "333-3357486430", holder: "김소연" };
+
+const MENU = [
+  { cat:"COFFEE", items:[
+    { id:"americano", name:"아메리카노", en:"Americano", hot:1500, ice:2000 },
+    { id:"cafelatte", name:"카페라떼", en:"Cafe Latte", hot:2000, ice:2500 },
+    { id:"vanilla", name:"바닐라라떼", en:"Vanilla Latte", hot:2500, ice:3000 },
+    { id:"caramel", name:"카라멜 마끼야또", en:"Caramel Macchiato", hot:2500, ice:3000 },
+    { id:"dolce", name:"돌체라떼", en:"Dolce Latte", hot:2500, ice:3000 },
+    { id:"coldbrew", name:"콜드브루", en:"Cold Brew", ice:2500 }
+  ]},
+  { cat:"NON COFFEE", items:[
+    { id:"javachip", name:"자바칩 초코라떼", en:"Java Chip Chocolate Latte", hot:2000, ice:2500 },
+    { id:"greentea", name:"녹차라떼", en:"Green Tea Latte", hot:2500, ice:3000 },
+    { id:"mintchoco", name:"민트초코라떼", en:"Mint Chocolate Latte", hot:2500, ice:3000 },
+    { id:"cookiecream", name:"쿠앤크라떼", en:"Cookie & Cream Latte", hot:2500, ice:3000 },
+    { id:"toffeenut", name:"토피넛라떼", en:"Toffee Nut Latte", hot:2500, ice:3000 },
+    { id:"peachtea", name:"복숭아 아이스티", en:"Peach Iced Tea", ice:1500 }
+  ]},
+  { cat:"TEA", items:[
+    { id:"hibiscus", name:"히비스커스", en:"Hibiscus", hot:1500, ice:2000 },
+    { id:"earlgray", name:"얼그레이", en:"Earl Gray", hot:1500, ice:2000 },
+    { id:"peppermint", name:"페퍼민트", en:"Peppermint", hot:1500, ice:2000 }
+  ]},
+  { cat:"ADE", items:[
+    { id:"greengrape", name:"청포도 에이드", en:"Green Grape Ade", single:2500 },
+    { id:"lemonade", name:"레몬 에이드", en:"Lemon Ade", single:2500 },
+    { id:"grapefruit", name:"자몽 에이드", en:"Grapefruit Ade", single:2500 },
+    { id:"cherryade", name:"체리 에이드", en:"Cherry Ade", single:2500 },
+    { id:"cherrycoke", name:"체리콕", en:"Cherry Coke", single:2500 },
+    { id:"eolbaksa", name:"얼박사", en:"Iced Bacchus & Sprite", single:2500 }
+  ]},
+  { cat:"DESSERT", items:[
+    { id:"croffle", name:"크로플", en:"Croffle", single:1500 },
+    { id:"donut", name:"크리스피 도넛", en:"Crispy Doughnut", single:2000 },
+    { id:"saltbread", name:"소금빵", en:"Salted Butter Roll", single:2500 },
+    { id:"egg", name:"구운 달걀(2개입)", en:"Baked Egg (2ea)", single:1000 }
+  ]}
+];
+
+function fmt(n){ return n.toLocaleString('ko-KR'); }
+function optLabel(temp, shot){
+  const parts = [];
+  if(temp) parts.push(temp.toUpperCase());
+  if(shot) parts.push('샷추가');
+  return parts.join(' · ');
+}
+
+function makeDraggable(sheetEl, onClose){
+  if(!sheetEl) return;
+  const handle = sheetEl.querySelector('.sheet-handle') || sheetEl;
+  let startY = 0, dy = 0;
+
+  function onMove(e){
+    const y = e.touches ? e.touches[0].clientY : e.clientY;
+    dy = Math.max(0, y - startY);
+    sheetEl.style.transform = `translateY(${dy}px)`;
+  }
+  function onUp(){
+    document.removeEventListener('mousemove', onMove);
+    document.removeEventListener('mouseup', onUp);
+    document.removeEventListener('touchmove', onMove);
+    document.removeEventListener('touchend', onUp);
+    sheetEl.style.transition = 'transform .18s ease';
+    if(dy > 90){
+      sheetEl.style.transform = 'translateY(100%)';
+      setTimeout(onClose, 140);
+    } else {
+      sheetEl.style.transform = 'translateY(0)';
+    }
+  }
+  function onDown(e){
+    dy = 0;
+    startY = e.touches ? e.touches[0].clientY : e.clientY;
+    sheetEl.style.transition = 'none';
+    document.addEventListener('mousemove', onMove);
+    document.addEventListener('mouseup', onUp);
+    document.addEventListener('touchmove', onMove, {passive:true});
+    document.addEventListener('touchend', onUp);
+  }
+  handle.addEventListener('mousedown', onDown);
+  handle.addEventListener('touchstart', onDown, {passive:true});
+}
+function uid(){ return Date.now().toString(36)+Math.random().toString(36).slice(2,7); }
+
+/* ===================== doodle svg helpers ===================== */
+function doodleDivider(){
+  return `<svg class="doodle-divider" viewBox="0 0 400 14" preserveAspectRatio="none">
+    <path d="M0 7 Q10 0 20 7 T40 7 T60 7 T80 7 T100 7 T120 7 T140 7 T160 7 T180 7 T200 7 T220 7 T240 7 T260 7 T280 7 T300 7 T320 7 T340 7 T360 7 T380 7 T400 7"
+      fill="none" stroke="#221E19" stroke-width="1.4" stroke-dasharray="1 7" stroke-linecap="round"/>
+  </svg>`;
+}
+function starIcon(size,color){
+  return `<svg width="${size}" height="${size}" viewBox="0 0 24 24" fill="none">
+    <path d="M12 2 L14 9 L21 9 L15.5 13.2 L17.5 20 L12 15.8 L6.5 20 L8.5 13.2 L3 9 L10 9 Z" stroke="${color||'#221E19'}" stroke-width="1.3" fill="none" stroke-linejoin="round"/>
+  </svg>`;
+}
+function mascotSvg(){
+  return `<svg width="120" height="120" viewBox="0 0 120 120" fill="none">
+    <ellipse cx="60" cy="66" rx="34" ry="30" stroke="#221E19" stroke-width="2.5"/>
+    <circle cx="34" cy="34" r="13" stroke="#221E19" stroke-width="2.5"/>
+    <circle cx="86" cy="34" r="13" stroke="#221E19" stroke-width="2.5"/>
+    <circle cx="49" cy="58" r="3.2" fill="#221E19"/>
+    <circle cx="71" cy="58" r="3.2" fill="#221E19"/>
+    <path d="M52 72 Q60 78 68 72" stroke="#221E19" stroke-width="2.2" fill="none" stroke-linecap="round"/>
+    <path d="M40 92 Q60 84 80 92" stroke="#EE9457" stroke-width="3" fill="none" stroke-linecap="round"/>
+  </svg>`;
+}
+
+/* ===================== app state ===================== */
+let cart = [];          // {key,id,name,en,temp,shot,price,qty}
+let activeCat = MENU[0].cat;
+let sheetItem = null;   // item currently in the option sheet
+let sheetCat = null;    // category of the item in the option sheet
+let sheetTemp = null;
+let sheetShot = false;
+let sheetQty = 1;
+let showCartDrawer = false;
+let stage = 'menu';     // menu | checkout | done
+let orderName = '';
+let lastOrder = null;
+let submitting = false;
+
+const SHOT_PRICE = 500;
+const SHOT_CATS = ['COFFEE','NON COFFEE','TEA'];
+
+function cartCount(){ return cart.reduce((s,c)=>s+c.qty,0); }
+function cartTotal(){ return cart.reduce((s,c)=>s+c.qty*c.price,0); }
+
+function addToCart(item, temp, qty, shot){
+  const base = temp==='hot' ? item.hot : temp==='ice' ? item.ice : item.single;
+  const price = base + (shot ? SHOT_PRICE : 0);
+  const key = item.id+'-'+(temp||'single')+(shot?'-shot':'');
+  const existing = cart.find(c=>c.key===key);
+  if(existing){ existing.qty += qty; }
+  else { cart.push({ key, id:item.id, name:item.name, en:item.en, temp, shot:!!shot, price, qty }); }
+}
+
+function openSheet(item, cat){
+  sheetItem = item;
+  sheetCat = cat;
+  sheetTemp = item.hot ? 'hot' : (item.ice ? 'ice' : null);
+  sheetShot = false;
+  sheetQty = 1;
+  render();
+}
+function closeSheet(){ sheetItem=null; render(); }
+
+/* ===================== render: customer ===================== */
+function renderMenuScreen(){
+  const cats = MENU.map(m=>m.cat);
+  const tabsHtml = cats.map(c=>`<button class="tab-btn ${c===activeCat?'active':''}" data-cat="${c}">${c}</button>`).join('');
+  const section = MENU.find(m=>m.cat===activeCat);
+  const itemsHtml = section.items.map(it=>{
+    let priceHtml;
+    if(it.single!=null){
+      priceHtml = `${fmt(it.single)}원`;
+    } else if(it.hot && it.ice){
+      priceHtml = `<small>HOT ${fmt(it.hot)} · ICE ${fmt(it.ice)}</small>`;
+    } else if(it.ice){
+      priceHtml = `${fmt(it.ice)}원 <small>ICE</small>`;
+    }
+    return `<div class="menu-card" data-item="${it.id}">
+      <div>
+        <div class="menu-name">${it.name}</div>
+        <div class="menu-en">${it.en}</div>
+      </div>
+      <div class="menu-price">${priceHtml}</div>
+    </div>`;
+  }).join('');
+
+  return `
+    <div class="header">
+      <div class="brand-row">${starIcon(16,'#7C8F63')}<div class="display brand-title">로뎀카페</div>${starIcon(16,'#EE9457')}</div>
+      <div class="brand-sub">RODEM CAFE · MOBILE ORDER</div>
+    </div>
+    <div class="tabs">${tabsHtml}</div>
+    <div class="menu-list">${itemsHtml}</div>
+    ${cart.length>0 ? `
+    <div class="cart-bar" id="cartBar">
+      <div class="cart-bar-left"><span class="cart-badge">${cartCount()}</span> 장바구니 보기</div>
+      <div class="cart-bar-right">${fmt(cartTotal())}원</div>
+    </div>` : ''}
+  `;
+}
+
+function renderOptionSheet(){
+  if(!sheetItem) return '';
+  const it = sheetItem;
+  const hasTemp = it.hot && it.ice;
+  const basePrice = hasTemp ? (sheetTemp==='hot'?it.hot:it.ice) : (it.single!=null? it.single : it.ice);
+  const canShot = SHOT_CATS.includes(sheetCat);
+  const unitPrice = basePrice + (canShot && sheetShot ? SHOT_PRICE : 0);
+  return `
+  <div class="overlay" id="sheetOverlay">
+    <div class="sheet" id="sheetBody">
+      <div class="sheet-handle"></div>
+      <div class="display" style="font-size:19px;">${it.name}</div>
+      <div style="font-size:12px;color:var(--ink-soft);margin-top:2px;">${it.en}</div>
+      ${hasTemp ? `
+      <div class="opt-row">
+        <div class="opt-btn ${sheetTemp==='hot'?'active':''}" data-temp="hot">HOT · ${fmt(it.hot)}원</div>
+        <div class="opt-btn ${sheetTemp==='ice'?'active':''}" data-temp="ice">ICE · ${fmt(it.ice)}원</div>
+      </div>` : `<div style="margin:16px 0 0;font-family:'Jua',sans-serif;color:var(--brown);font-size:16px;">${fmt(basePrice)}원</div>`}
+      ${canShot ? `
+      <div class="shot-toggle ${sheetShot?'active':''}" id="shotToggle">
+        <span>샷 추가 (+${fmt(SHOT_PRICE)}원)</span>
+        <span class="shot-check">${sheetShot?'✓':''}</span>
+      </div>` : ''}
+      <div class="qty-row">
+        <div class="qty-btn" id="qtyMinus">−</div>
+        <div class="qty-num">${sheetQty}</div>
+        <div class="qty-btn" id="qtyPlus">+</div>
+      </div>
+      <button class="primary-btn" id="addCartBtn">${fmt(unitPrice*sheetQty)}원 담기</button>
+    </div>
+  </div>`;
+}
+
+function renderCartDrawer(){
+  if(!showCartDrawer) return '';
+  const itemsHtml = cart.length ? cart.map(c=>`
+    <div class="cart-item" data-key="${c.key}">
+      <div>
+        <div class="cart-item-name">${c.name} ${optLabel(c.temp,c.shot)?`<span class="cart-item-opt">(${optLabel(c.temp,c.shot)})</span>`:''}</div>
+        <div class="cart-item-opt">${fmt(c.price)}원</div>
+      </div>
+      <div class="cart-item-ctrl">
+        <div class="mini-btn" data-act="minus" data-key="${c.key}">−</div>
+        <div style="font-family:'Jua',sans-serif;">${c.qty}</div>
+        <div class="mini-btn" data-act="plus" data-key="${c.key}">+</div>
+        <span class="remove-x" data-act="remove" data-key="${c.key}">삭제</span>
+      </div>
+    </div>
+  `).join('') : `<div class="empty-state">${mascotSvg()}<div style="margin-top:10px;">아직 담은 메뉴가 없어요</div></div>`;
+
+  return `
+  <div class="overlay" id="cartOverlay">
+    <div class="sheet" id="cartSheetBody">
+      <div class="sheet-handle"></div>
+      <div class="display" style="font-size:19px;margin-bottom:6px;">장바구니</div>
+      ${itemsHtml}
+      ${cart.length ? `
+      <div class="total-row"><span>총 금액</span><span>${fmt(cartTotal())}원</span></div>
+      <button class="primary-btn" id="goCheckoutBtn">주문하기</button>
+      ` : `<button class="ghost-btn" id="closeCartBtn" style="margin-top:16px;">메뉴 보러가기</button>`}
+    </div>
+  </div>`;
+}
+
+function renderCheckout(){
+  return `
+    <div class="header">
+      <div class="brand-row">${starIcon(15,'#7C8F63')}<div class="display brand-title" style="font-size:22px;">주문 확인</div></div>
+    </div>
+    <div style="padding:16px 18px;">
+      <div class="field-label">주문자 이름</div>
+      <input class="text-input" id="nameInput" placeholder="이름을 입력해주세요" value="${orderName}"/>
+
+      <div style="margin-top:18px;">
+        ${cart.map(c=>`
+          <div class="cart-item">
+            <div>
+              <div class="cart-item-name">${c.name} ${optLabel(c.temp,c.shot)?`(${optLabel(c.temp,c.shot)})`:''} × ${c.qty}</div>
+            </div>
+            <div style="font-family:'Jua',sans-serif;">${fmt(c.price*c.qty)}원</div>
+          </div>
+        `).join('')}
+      </div>
+
+      <div class="amount-big">${fmt(cartTotal())}원</div>
+      <div style="text-align:center;font-size:12px;color:var(--ink-soft);">아래 카카오페이 계좌로 위 금액을 보내주세요</div>
+
+      <div class="pay-card">
+        <img src="${QR_IMG}" alt="카카오페이 QR"/>
+        <div class="account-box">
+          <div class="account-text">${ACCOUNT.bank}<b>${ACCOUNT.number}</b>예금주 ${ACCOUNT.holder}</div>
+          <button class="copy-btn" id="copyAccountBtn">복사</button>
+        </div>
+      </div>
+
+      <button class="primary-btn" id="confirmPayBtn" ${submitting?'disabled':''}>${submitting? '접수 중...' : '송금 완료 · 주문 접수'}</button>
+      <button class="ghost-btn" style="margin-top:10px;" id="backToCartBtn">장바구니로 돌아가기</button>
+    </div>
+  `;
+}
+
+function renderDone(){
+  const o = lastOrder;
+  return `
+    <div class="done-wrap">
+      ${mascotSvg()}
+      <div style="font-family:'Jua',sans-serif;font-size:18px;margin-top:14px;">주문이 접수됐어요!</div>
+      <div class="order-num-badge">${o.number}번</div>
+      <div style="color:var(--ink-soft);font-size:13px;">${o.name}님 · ${fmt(o.total)}원</div>
+      <div style="color:var(--ink-soft);font-size:12px;margin-top:6px;">카운터에서 번호를 불러드릴게요 ☕</div>
+      <button class="primary-btn" style="margin-top:26px;" id="newOrderBtn">새 주문하기</button>
+    </div>
+  `;
+}
+
+function render(){
+  const app = document.getElementById('app');
+  let html = '';
+  if(stage==='menu') html = renderMenuScreen();
+  else if(stage==='checkout') html = renderCheckout();
+  else if(stage==='done') html = renderDone();
+  html += renderOptionSheet();
+  html += renderCartDrawer();
+  app.innerHTML = html;
+  attachHandlers();
+}
+
+function attachHandlers(){
+  document.querySelectorAll('.tab-btn').forEach(b=>{
+    b.onclick = ()=>{ activeCat = b.dataset.cat; render(); };
+  });
+  document.querySelectorAll('.menu-card').forEach(c=>{
+    c.onclick = ()=>{
+      const id = c.dataset.item;
+      const item = MENU.flatMap(m=>m.items).find(i=>i.id===id);
+      openSheet(item, activeCat);
+    };
+  });
+  const cartBar = document.getElementById('cartBar');
+  if(cartBar) cartBar.onclick = ()=>{ showCartDrawer = true; render(); };
+
+  // option sheet
+  const sheetOverlay = document.getElementById('sheetOverlay');
+  if(sheetOverlay){
+    sheetOverlay.onclick = (e)=>{ if(e.target.id==='sheetOverlay') closeSheet(); };
+    makeDraggable(document.getElementById('sheetBody'), closeSheet);
+    document.querySelectorAll('.opt-btn').forEach(b=>{
+      b.onclick = ()=>{ sheetTemp = b.dataset.temp; render(); };
+    });
+    const shotToggle = document.getElementById('shotToggle');
+    if(shotToggle) shotToggle.onclick = ()=>{ sheetShot = !sheetShot; render(); };
+    const minus = document.getElementById('qtyMinus');
+    const plus = document.getElementById('qtyPlus');
+    if(minus) minus.onclick = ()=>{ if(sheetQty>1) sheetQty--; render(); };
+    if(plus) plus.onclick = ()=>{ sheetQty++; render(); };
+    const addBtn = document.getElementById('addCartBtn');
+    if(addBtn) addBtn.onclick = ()=>{
+      addToCart(sheetItem, sheetTemp, sheetQty, SHOT_CATS.includes(sheetCat) && sheetShot);
+      sheetItem = null;
+      render();
+    };
+  }
+
+  // cart drawer
+  const cartOverlay = document.getElementById('cartOverlay');
+  if(cartOverlay){
+    cartOverlay.onclick = (e)=>{ if(e.target.id==='cartOverlay'){ showCartDrawer=false; render(); } };
+    makeDraggable(document.getElementById('cartSheetBody'), ()=>{ showCartDrawer=false; render(); });
+    document.querySelectorAll('[data-act]').forEach(el=>{
+      el.onclick = ()=>{
+        const key = el.dataset.key;
+        const c = cart.find(x=>x.key===key);
+        if(!c) return;
+        if(el.dataset.act==='minus'){ c.qty--; if(c.qty<=0) cart = cart.filter(x=>x.key!==key); }
+        if(el.dataset.act==='plus'){ c.qty++; }
+        if(el.dataset.act==='remove'){ cart = cart.filter(x=>x.key!==key); }
+        render();
+      };
+    });
+    const closeCartBtn = document.getElementById('closeCartBtn');
+    if(closeCartBtn) closeCartBtn.onclick = ()=>{ showCartDrawer=false; render(); };
+    const goCheckoutBtn = document.getElementById('goCheckoutBtn');
+    if(goCheckoutBtn) goCheckoutBtn.onclick = ()=>{ showCartDrawer=false; stage='checkout'; render(); };
+  }
+
+  // checkout
+  const nameInput = document.getElementById('nameInput');
+  if(nameInput){
+    nameInput.oninput = (e)=>{ orderName = e.target.value; };
+  }
+  const copyBtn = document.getElementById('copyAccountBtn');
+  if(copyBtn) copyBtn.onclick = ()=>{
+    navigator.clipboard.writeText(ACCOUNT.number.replace(/-/g,''));
+    copyBtn.textContent = '복사됨';
+    setTimeout(()=>{ copyBtn.textContent='복사'; },1500);
+  };
+  const backBtn = document.getElementById('backToCartBtn');
+  if(backBtn) backBtn.onclick = ()=>{ stage='menu'; showCartDrawer=true; render(); };
+  const confirmBtn = document.getElementById('confirmPayBtn');
+  if(confirmBtn) confirmBtn.onclick = submitOrder;
+
+  const newOrderBtn = document.getElementById('newOrderBtn');
+  if(newOrderBtn) newOrderBtn.onclick = ()=>{
+    cart = []; orderName=''; stage='menu'; lastOrder=null; render();
+  };
+}
+
+const API = '/.netlify/functions/orders';
+
+async function submitOrder(){
+  if(!orderName.trim()){
+    alert('이름을 입력해주세요');
+    return;
+  }
+  submitting = true; render();
+  try{
+    const res = await fetch(API, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        name: orderName.trim(),
+        items: cart.map(c=>({ name:c.name, temp:c.temp, shot:c.shot, price:c.price, qty:c.qty })),
+        total: cartTotal()
+      })
+    });
+    if(!res.ok) throw new Error('bad response');
+    const data = await res.json();
+    lastOrder = data.order;
+    submitting = false;
+    stage = 'done';
+    render();
+  }catch(e){
+    submitting = false;
+    alert('주문 접수 중 문제가 발생했어요. 다시 시도해주세요.');
+    render();
+  }
+}
+
+/* ===================== counter (staff) view ===================== */
+let counterFilter = 'pending';
+let counterOrders = [];
+
+async function loadOrders(){
+  try{
+    const res = await fetch(API);
+    const data = await res.json();
+    const orders = data.orders || [];
+    orders.sort((a,b)=>b.createdAt-a.createdAt);
+    counterOrders = orders;
+  }catch(e){ counterOrders = []; }
+  renderCounter();
+}
+
+async function toggleStatus(order){
+  const newStatus = order.status==='pending' ? 'done' : 'pending';
+  order.status = newStatus;
+  try{
+    await fetch(API, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id: order.id, status: newStatus })
+    });
+  }catch(_){}
+  loadOrders();
+}
+
+function timeStr(ts){
+  const d = new Date(ts);
+  return d.getHours().toString().padStart(2,'0')+':'+d.getMinutes().toString().padStart(2,'0');
+}
+
+function renderCounter(){
+  const app = document.getElementById('app');
+  const filtered = counterOrders.filter(o=> counterFilter==='all' ? true : o.status===counterFilter);
+  const pendingCount = counterOrders.filter(o=>o.status==='pending').length;
+
+  const listHtml = filtered.length ? filtered.map(o=>`
+    <div class="order-card ${o.status==='done'?'done':''}">
+      <div class="order-top">
+        <div class="order-no">${o.number}번</div>
+        <div class="order-time">${timeStr(o.createdAt)}</div>
+      </div>
+      <div class="order-name">${o.name}님</div>
+      <div class="order-items">${o.items.map(it=>`${it.name}${optLabel(it.temp,it.shot)?' ('+optLabel(it.temp,it.shot)+')':''} ×${it.qty}`).join('<br/>')}</div>
+      <div style="display:flex;justify-content:space-between;align-items:center;">
+        <div class="order-total">${fmt(o.total)}원</div>
+        <button class="ghost-btn" style="width:auto;padding:8px 16px;" data-id="${o.id}">${o.status==='pending' ? '완료 처리' : '대기로 되돌리기'}</button>
+      </div>
+    </div>
+  `).join('') : `<div class="empty-state">${mascotSvg()}<div style="margin-top:10px;">해당하는 주문이 없어요</div></div>`;
+
+  app.innerHTML = `
+    <div class="counter-wrap">
+      <div class="counter-header">
+        <div class="display" style="font-size:22px;">로뎀카페 · 카운터</div>
+        <div style="font-size:12px;opacity:0.8;margin-top:2px;">대기중인 주문 ${pendingCount}건</div>
+      </div>
+      <div class="counter-tabs">
+        <div class="ctab ${counterFilter==='pending'?'active':''}" data-f="pending">대기중</div>
+        <div class="ctab ${counterFilter==='done'?'active':''}" data-f="done">완료</div>
+        <div class="ctab ${counterFilter==='all'?'active':''}" data-f="all">전체</div>
+      </div>
+      ${listHtml}
+    </div>
+  `;
+  document.querySelectorAll('.ctab').forEach(b=>{
+    b.onclick = ()=>{ counterFilter=b.dataset.f; renderCounter(); };
+  });
+  document.querySelectorAll('.order-card button[data-id]').forEach(b=>{
+    b.onclick = ()=>{
+      const o = counterOrders.find(x=>x.id===b.dataset.id);
+      if(o) toggleStatus(o);
+    };
+  });
+}
+
+/* ===================== boot ===================== */
+function boot(){
+  if(location.hash === '#counter'){
+    loadOrders();
+    setInterval(loadOrders, 4000);
+  } else {
+    render();
+  }
+}
+boot();
+</script>
+</body>
+</html>
