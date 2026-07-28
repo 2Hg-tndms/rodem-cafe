@@ -1,10 +1,11 @@
-const { getStore } = require('@netlify/blobs');
+const { getStore, connectLambda } = require('@netlify/blobs');
 
 function uid() {
   return Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
 }
 
 exports.handler = async (event) => {
+  connectLambda(event);
   const headers = { 'Content-Type': 'application/json' };
   const store = getStore('rodem-orders');
 
