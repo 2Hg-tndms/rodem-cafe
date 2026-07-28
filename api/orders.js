@@ -38,6 +38,8 @@ module.exports = async (req, res) => {
         name: body.name,
         items: body.items,
         total: body.total,
+        cash: !!body.cash,
+        coupon: !!body.coupon,
         status: 'pending',
         createdAt: Date.now()
       };
