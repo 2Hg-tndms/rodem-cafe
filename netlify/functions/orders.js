@@ -27,7 +27,6 @@ exports.handler = async (event) => {
         return { statusCode: 400, headers, body: JSON.stringify({ error: 'invalid order' }) };
       }
 
-      // 빈 번호를 하나씩 "선점"하면서 찾기 (동시에 들어와도 절대 겹치지 않음)
       let n = 1;
       let claimed = false;
       while (!claimed) {
@@ -57,70 +56,4 @@ exports.handler = async (event) => {
       if (!body.id) {
         return { statusCode: 400, headers, body: JSON.stringify({ error: 'missing id' }) };
       }
-      const existing = await store.get('order:' + body.id, { type: 'json' });
-      if (!existing) {
-        return { statusCode: 404, headers, body: JSON.stringify({ error: 'not found' }) };
-      }
-      existing.status = body.status;
-      await store.setJSON('order:' + body.id, existing);
-      return { statusCode: 200, headers, body: JSON.stringify({ order: existing }) };
-    }
-
-    if (event.httpMethod === 'DELETE') {
-      const body = JSON.parse(event.body || '{}');
-      if (!body.id) {
-        return { statusCode: 400, headers, body: JSON.stringify({ error: 'missing id' }) };
-      }
-      const existing = await store.get('order:' + body.id, { type: 'json' });
-      await store.delete('order:' + body.id);
-      if (existing && typeof existing.number === 'number') {
-        await store.delete('numlock:' + existing.number);
-      }
-      return { statusCode: 200, headers, body: JSON.stringify({ ok: true }) };
-    }
-
-    return { statusCode: 405, headers, body: JSON.stringify({ error: 'method not allowed' }) };
-  } catch (err) {
-    return { statusCode: 500, headers, body: JSON.stringify({ error: String(err && err.message || err) }) };
-  }
-};      const order = {
-        id: uid(),
-        number: n,
-        name: body.name,
-        items: body.items,
-        total: body.total,
-        status: 'pending',
-        createdAt: Date.now()
-      };
-      await store.setJSON('order:' + order.id, order);
-      return { statusCode: 200, headers, body: JSON.stringify({ order }) };
-    }
-
-    if (event.httpMethod === 'PUT') {
-      const body = JSON.parse(event.body || '{}');
-      if (!body.id) {
-        return { statusCode: 400, headers, body: JSON.stringify({ error: 'missing id' }) };
-      }
-      const existing = await store.get('order:' + body.id, { type: 'json' });
-      if (!existing) {
-        return { statusCode: 404, headers, body: JSON.stringify({ error: 'not found' }) };
-      }
-      existing.status = body.status;
-      await store.setJSON('order:' + body.id, existing);
-      return { statusCode: 200, headers, body: JSON.stringify({ order: existing }) };
-    }
-
-    if (event.httpMethod === 'DELETE') {
-      const body = JSON.parse(event.body || '{}');
-      if (!body.id) {
-        return { statusCode: 400, headers, body: JSON.stringify({ error: 'missing id' }) };
-      }
-      await store.delete('order:' + body.id);
-      return { statusCode: 200, headers, body: JSON.stringify({ ok: true }) };
-    }
-
-    return { statusCode: 405, headers, body: JSON.stringify({ error: 'method not allowed' }) };
-  } catch (err) {
-    return { statusCode: 500, headers, body: JSON.stringify({ error: String(err && err.message || err) }) };
-  }
-};
+      const existing = await store.get('order:' + body.id, { t
