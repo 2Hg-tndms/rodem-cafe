@@ -206,13 +206,29 @@ position:fixed;right:8px;bottom:6px;z-index:5;
 font-size:10px;color:#B7AE9C;font-family:'Gowun Dodum',sans-serif;
 letter-spacing:0.5px;pointer-events:none;user-select:none;
 }
+.bell-input{
+width:100%;padding:16px 14px;border-radius:14px;border:2px solid var(--ink);
+font-family:'Jua',sans-serif;font-size:26px;text-align:center;background:var(--paper);
+color:var(--ink);letter-spacing:2px;
+}
+.bell-input::placeholder{font-size:15px;color:var(--ink-soft);letter-spacing:0;}
+.bell-pad{
+display:grid;grid-template-columns:repeat(5,1fr);gap:8px;margin-top:12px;
+}
+.bell-key{
+padding:16px 0;text-align:center;border-radius:12px;border:2px solid var(--ink);
+background:var(--paper);font-family:'Jua',sans-serif;font-size:20px;cursor:pointer;
+-webkit-tap-highlight-color:transparent;user-select:none;
+}
+.bell-key.active{background:var(--apricot);border-color:var(--apricot-deep);color:#fff;}
+.bell-key.clear{grid-column:span 5;font-size:15px;background:transparent;color:var(--ink-soft);}
 </style>
 </head>
 <body>
 <div id="app"></div>
 <div class="version-badge" id="versionBadge"></div>
 <script>
-const APP_VERSION = "VER 1.0";
+const APP_VERSION = "VER 1.1";
 const QR_IMG = "/qr.jpg";
 const ACCOUNT = { bank: "카카오뱅크", number: "3333-35-7486430", holder: "김소연" };
 const MENU = [
@@ -332,7 +348,7 @@ let sheetShot = false;
 let sheetQty = 1;
 let showCartDrawer = false;
 let stage = 'menu'; // menu | checkout | done
-let orderName = '';
+let bellNo = '';
 let cashPlanned = false;
 let couponPlanned = false;
 let lastOrder = null;
@@ -463,8 +479,12 @@ return `
 <div class="brand-row">${starIcon(15,'#7C8F63')}<div class="display brand-title" style="font-size:22px;">주문 확인</div></div>
 </div>
 <div style="padding:16px 18px;">
-<div class="field-label">주문자 이름</div>
-<input class="text-input" id="nameInput" placeholder="이름을 입력해주세요" value="${orderName}"/>
+<div class="field-label">진동벨 번호를 입력해주세요 (1~10)</div>
+<input class="bell-input" id="bellInput" inputmode="numeric" placeholder="번호를 누르거나 입력하세요" value="${bellNo}"/>
+<div class="bell-pad">
+${[1,2,3,4,5,6,7,8,9,10].map(n=>`<div class="bell-key ${String(n)===bellNo?'active':''}" data-bell="${n}">${n}</div>`).join('')}
+<div class="bell-key clear" data-bell="clear">지우기</div>
+</div>
 <div style="margin-top:18px;">
 ${cart.map(c=>`
 <div class="cart-item">
@@ -503,9 +523,10 @@ return `
 <div class="done-wrap">
 ${mascotSvg()}
 <div style="font-family:'Jua',sans-serif;font-size:18px;margin-top:14px;">주문이 접수됐어요!</div>
-<div class="order-num-badge">${o.number}번</div>
-<div style="color:var(--ink-soft);font-size:13px;">${o.name}님 · ${fmt(o.total)}원</div>
-<div style="color:var(--ink-soft);font-size:12px;margin-top:6px;">카운터에서 번호를 불러드릴게요 ☕</div>
+<div style="color:var(--ink-soft);font-size:13px;margin-top:10px;">진동벨 번호</div>
+<div class="order-num-badge">${o.bell || o.name}번</div>
+<div style="color:var(--ink-soft);font-size:13px;">주문번호 ${o.number} · ${fmt(o.total)}원</div>
+<div style="color:var(--ink-soft);font-size:12px;margin-top:6px;">진동벨을 가지고 자리에서 기다려주세요 ☕</div>
 <button class="primary-btn" style="margin-top:26px;" id="newOrderBtn">새 주문하기</button>
 </div>
 `;
@@ -576,11 +597,36 @@ if(closeCartBtn) closeCartBtn.onclick = ()=>{ showCartDrawer=false; render(); };
 const goCheckoutBtn = document.getElementById('goCheckoutBtn');
 if(goCheckoutBtn) goCheckoutBtn.onclick = ()=>{ showCartDrawer=false; stage='checkout'; render(); };
 }
-// checkout
-const nameInput = document.getElementById('nameInput');
-if(nameInput){
-nameInput.oninput = (e)=>{ orderName = e.target.value; };
+// checkout - 진동벨 번호 입력
+const bellInput = document.getElementById('bellInput');
+function syncBellUI(){
+if(bellInput) bellInput.value = bellNo;
+document.querySelectorAll('.bell-key[data-bell]').forEach(k=>{
+if(k.dataset.bell==='clear') return;
+k.classList.toggle('active', k.dataset.bell===bellNo);
+});
 }
+if(bellInput){
+bellInput.oninput = (e)=>{
+// 숫자만 허용, 1~10 범위로 제한
+let v = e.target.value.replace(/[^0-9]/g,'');
+if(v!==''){
+let n = parseInt(v,10);
+if(n>10) n=10;
+if(n<1) v=''; else v=String(n);
+}
+bellNo = v;
+e.target.value = v;
+syncBellUI();
+};
+}
+document.querySelectorAll('.bell-key[data-bell]').forEach(k=>{
+k.onclick = ()=>{
+if(k.dataset.bell==='clear'){ bellNo=''; }
+else { bellNo = k.dataset.bell; }
+syncBellUI();
+};
+});
 const copyBtn = document.getElementById('copyAccountBtn');
 if(copyBtn) copyBtn.onclick = ()=>{
 navigator.clipboard.writeText(ACCOUNT.number.replace(/-/g,''));
@@ -597,15 +643,16 @@ const confirmBtn = document.getElementById('confirmPayBtn');
 if(confirmBtn) confirmBtn.onclick = submitOrder;
 const newOrderBtn = document.getElementById('newOrderBtn');
 if(newOrderBtn) newOrderBtn.onclick = ()=>{
-cart = []; orderName=''; cashPlanned=false; couponPlanned=false; stage='menu'; lastOrder=null; render();
+cart = []; bellNo=''; cashPlanned=false; couponPlanned=false; stage='menu'; lastOrder=null; render();
 };
 }
 
 const API = '/api/orders';
 
 async function submitOrder(){
-if(!orderName.trim()){
-alert('이름을 입력해주세요');
+const n = parseInt(bellNo,10);
+if(!bellNo || isNaN(n) || n<1 || n>10){
+alert('진동벨 번호(1~10)를 입력해주세요');
 return;
 }
 submitting = true; render();
@@ -614,7 +661,8 @@ const res = await fetch(API, {
 method: 'POST',
 headers: { 'Content-Type': 'application/json' },
 body: JSON.stringify({
-name: orderName.trim(),
+name: bellNo,
+bell: bellNo,
 items: cart.map(c=>({ name:c.name, temp:c.temp, shot:c.shot, price:c.price, qty:c.qty })),
 total: cartTotal(),
 cash: cashPlanned,
@@ -707,6 +755,7 @@ headers:{ 'Content-Type':'application/json' },
 body: JSON.stringify({
 orderNumber: order.number,
 name: order.name,
+bell: order.bell || order.name,
 items: (order.items||[]).map(it=>({
 name: it.name,
 quantity: it.qty,
@@ -740,7 +789,7 @@ const listHtml = filtered.length ? filtered.map(o=>`
 <div class="order-no">${o.number}번</div>
 <div class="order-time">${timeStr(o.createdAt)}</div>
 </div>
-<div class="order-name">${o.name}님 ${o.cash?'<span style="color:var(--apricot-deep);font-weight:700;">· 현금결제 예정</span>':''} ${o.coupon?'<span style="color:var(--sage-deep);font-weight:700;">· 쿠폰 사용 예정</span>':''}</div>
+<div class="order-name">🔔 진동벨 ${o.bell || o.name}번 ${o.cash?'<span style="color:var(--apricot-deep);font-weight:700;">· 현금결제 예정</span>':''} ${o.coupon?'<span style="color:var(--sage-deep);font-weight:700;">· 쿠폰 사용 예정</span>':''}</div>
 <div class="order-items">${o.items.map(it=>`${it.name}${optLabel(it.temp,it.shot)?' ('+optLabel(it.temp,it.shot)+')':''} ×${it.qty}`).join('<br/>')}</div>
 <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;">
 <div class="order-total">${fmt(o.total)}원</div>
