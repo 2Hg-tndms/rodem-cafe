@@ -631,6 +631,14 @@ render();
 let counterFilter = 'pending';
 let counterOrders = [];
 
+// ===== 자동 영수증 출력용 상태 =====
+// 이미 출력한 주문 id 기억 (중복 출력 방지)
+const autoPrintedIds = new Set();
+// 첫 로딩 여부. 카운터를 처음 열었을 때 기존 주문이 한꺼번에 찍히는 걸 막음
+let autoPrintPrimed = false;
+// 자동 출력 켜기/끄기
+let autoPrintEnabled = true;
+
 async function loadOrders(){
 try{
 const res = await fetch(API);
@@ -638,6 +646,22 @@ const data = await res.json();
 const orders = data.orders || [];
 orders.sort((a,b)=>b.createdAt-a.createdAt);
 counterOrders = orders;
+
+// ===== 새 주문 자동 출력 =====
+if(!autoPrintPrimed){
+// 첫 로딩: 기존 주문들은 출력하지 않고 "이미 본 것"으로만 표시
+orders.forEach(o=>autoPrintedIds.add(o.id));
+autoPrintPrimed = true;
+} else if(autoPrintEnabled){
+// 아직 출력 안 했고 대기중인 주문만, 접수된 순서(오래된 것 먼저)로 출력
+const toPrint = orders
+.filter(o=> o.status==='pending' && !autoPrintedIds.has(o.id))
+.sort((a,b)=> a.createdAt - b.createdAt);
+for(const o of toPrint){
+autoPrintedIds.add(o.id); // 출력 시도 전에 먼저 기록해서 중복 방지
+await printReceipt(o);
+}
+}
 }catch(e){ counterOrders = []; }
 renderCounter();
 }
@@ -724,8 +748,15 @@ ${o.status==='done' ? `<button class="ghost-btn" style="width:auto;padding:8px 1
 app.innerHTML = `
 <div class="counter-wrap">
 <div class="counter-header">
+<div style="display:flex;justify-content:space-between;align-items:center;">
+<div>
 <div class="display" style="font-size:22px;">로뎀카페 · 카운터</div>
 <div style="font-size:12px;opacity:0.8;margin-top:2px;">대기중인 주문 ${pendingCount}건</div>
+</div>
+<div id="autoPrintToggle" style="cursor:pointer;font-size:12px;padding:8px 12px;border-radius:10px;border:2px solid var(--cream);${autoPrintEnabled?'background:var(--apricot);border-color:var(--apricot);':'opacity:0.7;'}">
+자동출력 ${autoPrintEnabled?'ON':'OFF'}
+</div>
+</div>
 </div>
 <div class="counter-tabs">
 <div class="ctab ${counterFilter==='pending'?'active':''}" data-f="pending">대기중</div>
@@ -738,6 +769,8 @@ ${listHtml}
 document.querySelectorAll('.ctab').forEach(b=>{
 b.onclick = ()=>{ counterFilter=b.dataset.f; renderCounter(); };
 });
+const autoBtn = document.getElementById('autoPrintToggle');
+if(autoBtn) autoBtn.onclick = ()=>{ autoPrintEnabled = !autoPrintEnabled; renderCounter(); };
 document.querySelectorAll('.order-card button[data-id]').forEach(b=>{
 b.onclick = ()=>{
 const o = counterOrders.find(x=>x.id===b.dataset.id);
