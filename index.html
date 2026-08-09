@@ -229,7 +229,7 @@ background:var(--paper);font-family:'Jua',sans-serif;font-size:20px;cursor:point
 <div id="app"></div>
 <div class="version-badge" id="versionBadge"></div>
 <script>
-const APP_VERSION = "VER 1.2";
+const APP_VERSION = "VER 2.0";
 const QR_IMG = "/qr.jpg";
 const ACCOUNT = { bank: "카카오뱅크", number: "3333-35-7486430", holder: "김소연" };
 const MENU = [
@@ -715,7 +715,7 @@ const toPrint = orders
 .sort((a,b)=> a.createdAt - b.createdAt);
 for(const o of toPrint){
 autoPrintedIds.add(o.id); // 출력 시도 전에 먼저 기록해서 중복 방지
-await printReceipt(o);
+await printReceipt(o, false);
 }
 }
 }catch(e){ counterOrders = []; }
@@ -748,7 +748,9 @@ loadOrders();
 }
 
 // ===================== 영수증 출력 =====================
-async function printReceipt(order){
+// manual=true 이면 사람이 버튼을 누른 것 → 실패 시 알림 표시
+// manual=false (자동 출력) → 실패해도 조용히 콘솔에만 기록
+async function printReceipt(order, manual){
 try{
 const res = await fetch('http://localhost:4000/print', {
 method:'POST',
@@ -771,8 +773,10 @@ coupon: order.coupon
 const data = await res.json();
 if(!data.success) throw new Error(data.error||'출력 실패');
 }catch(err){
+if(manual){
 alert('출력 실패: 노트북에서 프린트 서버(start.bat)가 켜져 있는지 확인해주세요.');
-console.error(err);
+}
+console.error('영수증 출력 실패:', err);
 }
 }
 
@@ -795,7 +799,7 @@ const listHtml = filtered.length ? filtered.map(o=>`
 <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;">
 <div class="order-total">${fmt(o.total)}원</div>
 <div style="display:flex;gap:8px;flex-wrap:wrap;">
-<button class="ghost-btn" style="width:auto;padding:8px 16px;" data-printid="${o.id}">영수증 출력</button>
+<button class="ghost-btn" style="width:auto;padding:8px 16px;" data-printid="${o.id}">재출력</button>
 <button class="ghost-btn" style="width:auto;padding:8px 16px;" data-id="${o.id}">${o.status==='pending' ? '완료 처리' : '대기로 되돌리기'}</button>
 ${o.status==='done' ? `<button class="ghost-btn" style="width:auto;padding:8px 16px;color:var(--danger);border-color:var(--danger);" data-delid="${o.id}">삭제</button>` : ''}
 </div>
@@ -843,7 +847,7 @@ if(o) deleteOrder(o);
 document.querySelectorAll('.order-card button[data-printid]').forEach(b=>{
 b.onclick = ()=>{
 const o = counterOrders.find(x=>x.id===b.dataset.printid);
-if(o) printReceipt(o);
+if(o) printReceipt(o, true);
 };
 });
 }
