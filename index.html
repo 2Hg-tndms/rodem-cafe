@@ -201,11 +201,18 @@ margin:12px 20px;padding:16px;
 .order-items{font-size:14px;line-height:1.7;margin-bottom:10px;}
 .order-total{font-family:'Jua',sans-serif;font-size:16px;color:var(--brown);}
 .empty-state{text-align:center;padding:60px 24px;color:var(--ink-soft);}
+.version-badge{
+position:fixed;right:8px;bottom:6px;z-index:5;
+font-size:10px;color:#B7AE9C;font-family:'Gowun Dodum',sans-serif;
+letter-spacing:0.5px;pointer-events:none;user-select:none;
+}
 </style>
 </head>
 <body>
 <div id="app"></div>
+<div class="version-badge" id="versionBadge"></div>
 <script>
+const APP_VERSION = "VER 1.0";
 const QR_IMG = "/qr.jpg";
 const ACCOUNT = { bank: "카카오뱅크", number: "3333-35-7486430", holder: "김소연" };
 const MENU = [
@@ -794,6 +801,8 @@ if(o) printReceipt(o);
 /* ===================== boot ===================== */
 const COUNTER_PASSWORD = 'juice';
 function boot(){
+const vb = document.getElementById('versionBadge');
+if(vb) vb.textContent = APP_VERSION;
 if(location.hash === '#counter'){
 if(sessionStorage.getItem('counterAuth') === '1'){
 loadOrders();
