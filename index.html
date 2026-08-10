@@ -261,7 +261,7 @@ background:var(--paper);font-family:'Jua',sans-serif;font-size:20px;cursor:point
 <div id="app"></div>
 <div class="version-badge" id="versionBadge"></div>
 <script>
-const APP_VERSION = "VER 3.0";
+const APP_VERSION = "VER 3.1";
 const QR_IMG = "/qr.jpg";
 const ACCOUNT = { bank: "카카오뱅크", number: "3333-35-7486430", holder: "김소연" };
 const MENU = [
@@ -1015,8 +1015,13 @@ app.innerHTML = `
 <div class="display" style="font-size:22px;">로뎀카페 · 카운터</div>
 <div style="font-size:12px;opacity:0.8;margin-top:2px;">대기중인 주문 ${pendingCount}건</div>
 </div>
+<div style="display:flex;gap:8px;align-items:center;">
+<div id="resetNumBtn" style="cursor:pointer;font-size:12px;padding:8px 12px;border-radius:10px;border:2px solid var(--cream);">
+번호 초기화
+</div>
 <div id="autoPrintToggle" style="cursor:pointer;font-size:12px;padding:8px 12px;border-radius:10px;border:2px solid var(--cream);${autoPrintEnabled?'background:var(--apricot);border-color:var(--apricot);':'opacity:0.7;'}">
 자동출력 ${autoPrintEnabled?'ON':'OFF'}
+</div>
 </div>
 </div>
 </div>
@@ -1033,6 +1038,20 @@ b.onclick = ()=>{ counterFilter=b.dataset.f; renderCounter(); };
 });
 const autoBtn = document.getElementById('autoPrintToggle');
 if(autoBtn) autoBtn.onclick = ()=>{ autoPrintEnabled = !autoPrintEnabled; renderCounter(); };
+const resetBtn = document.getElementById('resetNumBtn');
+if(resetBtn) resetBtn.onclick = async ()=>{
+if(!confirm('주문번호를 1번부터 다시 시작할까요? (진행 중인 주문 목록은 그대로예요)')) return;
+try{
+await fetch(API, {
+method:'POST',
+headers:{ 'Content-Type':'application/json' },
+body: JSON.stringify({ action:'resetNumber' })
+});
+alert('다음 주문부터 1번으로 시작해요.');
+}catch(e){
+alert('초기화 실패. 다시 시도해주세요.');
+}
+};
 document.querySelectorAll('.order-card button[data-id]').forEach(b=>{
 b.onclick = ()=>{
 const o = counterOrders.find(x=>x.id===b.dataset.id);
@@ -1075,6 +1094,7 @@ let salesData = null;      // { dates, salesByDate, costs }
 let salesView = 'week';    // week | month | cost
 let salesCosts = {};       // 편집 중인 원가
 let openDate = null;       // 상세 펼친 날짜/월 키
+let ordersExpanded = false; // 주문 내역 아코디언 펼침 여부
 
 async function loadSales(){
   try{
@@ -1095,12 +1115,15 @@ function aggregateItems(records){
     total += (r.total||0);
     count += 1;
     (r.items||[]).forEach(it=>{
-      const nm = it.name;
       const qty = it.qty || 1;
       const price = it.price || 0;
-      if(!byMenu[nm]) byMenu[nm] = { qty:0, amount:0 };
-      byMenu[nm].qty += qty;
-      byMenu[nm].amount += price * qty;
+      // 옵션(HOT/ICE, 샷추가)까지 구분해서 별개 항목으로 집계
+      const opt = optLabel(it.temp, it.shot);
+      const label = it.name + (opt ? ` (${opt})` : '');
+      const key = label;
+      if(!byMenu[key]) byMenu[key] = { qty:0, amount:0, baseName: it.name, label };
+      byMenu[key].qty += qty;
+      byMenu[key].amount += price * qty;
     });
   });
   return { byMenu, total, count };
@@ -1109,24 +1132,26 @@ function aggregateItems(records){
 // 메뉴별 집계 -> 카테고리별 묶음
 function groupByCat(byMenu){
   const cats = {};
-  Object.keys(byMenu).forEach(nm=>{
-    const cat = NAME_TO_CAT[nm] || '기타';
+  Object.keys(byMenu).forEach(key=>{
+    const entry = byMenu[key];
+    const cat = NAME_TO_CAT[entry.baseName] || '기타';
     if(!cats[cat]) cats[cat] = { items:{}, qty:0, amount:0 };
-    cats[cat].items[nm] = byMenu[nm];
-    cats[cat].qty += byMenu[nm].qty;
-    cats[cat].amount += byMenu[nm].amount;
+    cats[cat].items[key] = entry;
+    cats[cat].qty += entry.qty;
+    cats[cat].amount += entry.amount;
   });
   return cats;
 }
 
-// 원가 총합 계산 (원가 입력된 메뉴만)
+// 원가 총합 계산 (원가는 메뉴 원본 이름 기준으로 매칭)
 function calcCost(byMenu){
   let totalCost = 0;
   let hasCost = false;
-  Object.keys(byMenu).forEach(nm=>{
-    const c = salesCosts[nm];
+  Object.keys(byMenu).forEach(key=>{
+    const entry = byMenu[key];
+    const c = salesCosts[entry.baseName];
     if(c != null && c !== ''){
-      totalCost += Number(c) * byMenu[nm].qty;
+      totalCost += Number(c) * entry.qty;
       hasCost = true;
     }
   });
@@ -1163,7 +1188,7 @@ function salesDetailHtml(records, saleDate, showOrders){
     html += `<div class="sales-row head"><span>${cat}</span><span class="q">수량</span><span class="a">금액</span></div>`;
     Object.keys(cats[cat].items).forEach(nm=>{
       const m = cats[cat].items[nm];
-      html += `<div class="sales-row"><span>${nm}</span><span class="q">${m.qty}</span><span class="a">${fmt(m.amount)}</span></div>`;
+      html += `<div class="sales-row"><span>${m.label}</span><span class="q">${m.qty}</span><span class="a">${fmt(m.amount)}</span></div>`;
     });
     html += `<div class="sales-row" style="color:var(--sage-deep);"><span>${cat} 소계</span><span class="q">${cats[cat].qty}</span><span class="a">${fmt(cats[cat].amount)}</span></div>`;
   });
@@ -1179,27 +1204,32 @@ function salesDetailHtml(records, saleDate, showOrders){
 
   let out = box + `<div class="sales-card">${html}</div>`;
 
-  // 개별 주문 내역 (주별 상세에서만)
+  // 개별 주문 내역 (주별 상세에서만) - 아코디언
   if(showOrders){
     const sorted = records.slice().sort((a,b)=> (a.completedAt||a.createdAt||0)-(b.completedAt||b.createdAt||0));
-    let cards = `<div style="font-size:12px;color:var(--ink-soft);margin:16px 20px 4px;">주문 내역 (${sorted.length}건)</div>`;
-    cards += sorted.map(o=>`
-      <div class="order-card">
-        <div class="order-top">
-          <div class="order-no">${o.number}번</div>
-          <div class="order-time">${timeStr(o.completedAt||o.createdAt)}</div>
-        </div>
-        <div class="order-items">${(o.items||[]).map(it=>`${it.name}${optLabel(it.temp,it.shot)?' ('+optLabel(it.temp,it.shot)+')':''} ×${it.qty}`).join('<br/>')}</div>
-        <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;">
-          <div class="order-total">${fmt(o.total)}원 ${o.cash?'<span style="color:var(--apricot-deep);font-size:12px;">·현금</span>':''} ${o.coupon?'<span style="color:var(--sage-deep);font-size:12px;">·쿠폰</span>':''}</div>
-          <div style="display:flex;gap:8px;flex-wrap:wrap;">
-            <button class="ghost-btn" style="width:auto;padding:8px 16px;color:var(--sage-deep);border-color:var(--sage-deep);" data-seditid="${o.id}" data-sdate="${saleDate}">수정</button>
-            <button class="ghost-btn" style="width:auto;padding:8px 16px;color:var(--danger);border-color:var(--danger);" data-sdelid="${o.id}" data-sdate="${saleDate}">삭제</button>
+    let acc = `<div id="ordersToggle" style="cursor:pointer;display:flex;justify-content:space-between;align-items:center;background:var(--paper);border:1.5px solid var(--line);border-radius:14px;margin:16px 20px 4px;padding:14px 16px;">
+      <span style="font-family:'Jua',sans-serif;font-size:15px;">주문 내역 (${sorted.length}건)</span>
+      <span style="color:var(--ink-soft);">${ordersExpanded?'▲ 접기':'▼ 펼치기'}</span>
+    </div>`;
+    if(ordersExpanded){
+      acc += sorted.map(o=>`
+        <div class="order-card">
+          <div class="order-top">
+            <div class="order-no">${o.number}번</div>
+            <div class="order-time">${timeStr(o.completedAt||o.createdAt)}</div>
+          </div>
+          <div class="order-items">${(o.items||[]).map(it=>`${it.name}${optLabel(it.temp,it.shot)?' ('+optLabel(it.temp,it.shot)+')':''} ×${it.qty}`).join('<br/>')}</div>
+          <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;">
+            <div class="order-total">${fmt(o.total)}원 ${o.cash?'<span style="color:var(--apricot-deep);font-size:12px;">·현금</span>':''} ${o.coupon?'<span style="color:var(--sage-deep);font-size:12px;">·쿠폰</span>':''}</div>
+            <div style="display:flex;gap:8px;flex-wrap:wrap;">
+              <button class="ghost-btn" style="width:auto;padding:8px 16px;color:var(--sage-deep);border-color:var(--sage-deep);" data-seditid="${o.id}" data-sdate="${saleDate}">수정</button>
+              <button class="ghost-btn" style="width:auto;padding:8px 16px;color:var(--danger);border-color:var(--danger);" data-sdelid="${o.id}" data-sdate="${saleDate}">삭제</button>
+            </div>
           </div>
         </div>
-      </div>
-    `).join('');
-    out += cards;
+      `).join('');
+    }
+    out += acc;
   }
 
   return out;
@@ -1291,11 +1321,13 @@ function renderSales(){
     b.onclick = ()=>{ salesView=b.dataset.sv; openDate=null; renderSales(); };
   });
   document.querySelectorAll('.sales-date-btn[data-date]').forEach(b=>{
-    b.onclick = ()=>{ const d=b.dataset.date; openDate = (openDate===d? null : d); renderSales(); };
+    b.onclick = ()=>{ const d=b.dataset.date; openDate = (openDate===d? null : d); ordersExpanded=false; renderSales(); };
   });
   document.querySelectorAll('.sales-date-btn[data-month]').forEach(b=>{
     b.onclick = ()=>{ const k='M'+b.dataset.month; openDate = (openDate===k? null : k); renderSales(); };
   });
+  const ordersToggle = document.getElementById('ordersToggle');
+  if(ordersToggle) ordersToggle.onclick = ()=>{ ordersExpanded = !ordersExpanded; renderSales(); };
   // 매출 내역 개별 주문 수정
   document.querySelectorAll('[data-seditid]').forEach(b=>{
     b.onclick = ()=>{
