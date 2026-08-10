@@ -51,17 +51,24 @@ module.exports = async (req, res) => {
 
     if (req.method === 'POST') {
       const body = req.body;
+
+      // 주문번호 초기화 (오늘 카운터를 0으로)
+      if (body && body.action === 'resetNumber') {
+        const today = kstDateStr(Date.now());
+        await redis.set('ordernum:' + today, 0);
+        return res.status(200).json({ ok: true, date: today });
+      }
+
       if (!body || !body.name || !Array.isArray(body.items) || body.items.length === 0) {
         return res.status(400).json({ error: 'invalid order' });
       }
-      let n = 1;
-      let claimed = false;
-      while (!claimed) {
-        const result = await redis.set('numlock:' + n, '1', { nx: true });
-        if (result === 'OK') claimed = true;
-        else n++;
-      }
       const now = Date.now();
+      const today = kstDateStr(now);
+      // 날짜별 카운터를 1씩 증가 (원자적). 날짜가 바뀌면 키가 달라져 자동으로 1부터 시작.
+      const n = await redis.incr('ordernum:' + today);
+      // 카운터 키가 무한정 안 남도록 이틀 뒤 만료
+      await redis.expire('ordernum:' + today, 60 * 60 * 48);
+
       const order = {
         id: uid(),
         number: n,
@@ -131,9 +138,6 @@ module.exports = async (req, res) => {
       await redis.hdel('orders', body.id);
       if (existingRaw) {
         const existing = typeof existingRaw === 'string' ? JSON.parse(existingRaw) : existingRaw;
-        if (typeof existing.number === 'number') {
-          await redis.del('numlock:' + existing.number);
-        }
         // 완료되어 매출에 있던 주문이면 매출에서도 제거
         if (existing.saleDate) {
           await removeFromSales(existing);
