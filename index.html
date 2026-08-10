@@ -225,6 +225,19 @@ margin:10px 20px;padding:16px;cursor:pointer;
 .sales-total-box .big{font-family:'Jua',sans-serif;font-size:26px;margin-top:4px;}
 .cost-input{width:80px;padding:6px 8px;border-radius:8px;border:1.5px solid var(--line);font-size:14px;text-align:right;font-family:'Gowun Dodum',sans-serif;}
 .cat-chip{display:inline-block;font-size:10px;padding:2px 8px;border-radius:999px;background:var(--cream);color:var(--sage-deep);margin-left:6px;}
+/* 주문 편집 모달 */
+.edit-item{display:flex;justify-content:space-between;align-items:center;padding:10px 0;border-bottom:1px solid var(--line);gap:8px;}
+.edit-item-name{font-size:14px;flex:1;}
+.edit-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:8px;margin-top:10px;}
+.edit-menu-cell{border:1.5px solid var(--line);border-radius:12px;padding:10px;background:var(--paper);}
+.edit-menu-title{font-size:13px;font-weight:700;text-align:center;margin-bottom:6px;min-height:32px;display:flex;align-items:center;justify-content:center;}
+.edit-temp-row{display:flex;gap:4px;margin-bottom:6px;}
+.edit-temp-btn{flex:1;padding:5px 0;text-align:center;border-radius:8px;border:1.5px solid var(--ink);font-size:12px;background:var(--paper);cursor:pointer;font-family:'Jua',sans-serif;}
+.edit-temp-btn.active{background:var(--apricot);border-color:var(--apricot-deep);color:#fff;}
+.edit-shot-row{display:flex;align-items:center;justify-content:space-between;font-size:11px;margin-bottom:6px;}
+.edit-shot-ctrl{display:flex;align-items:center;gap:6px;}
+.edit-mini{width:24px;height:24px;border-radius:6px;border:1.5px solid var(--ink);background:var(--paper);font-size:14px;line-height:1;cursor:pointer;display:flex;align-items:center;justify-content:center;padding:0;-webkit-tap-highlight-color:transparent;user-select:none;}
+.edit-add-btn{width:100%;padding:6px 0;border-radius:8px;border:none;background:var(--ink);color:var(--cream);font-size:12px;font-family:'Jua',sans-serif;cursor:pointer;}
 .bell-label{font-size:24px;font-weight:700;color:var(--ink);margin:8px 0 14px;font-family:'Jua',sans-serif;text-align:center;}
 .bell-input{
 width:100%;padding:16px 14px;border-radius:14px;border:2px solid var(--ink);
@@ -248,7 +261,7 @@ background:var(--paper);font-family:'Jua',sans-serif;font-size:20px;cursor:point
 <div id="app"></div>
 <div class="version-badge" id="versionBadge"></div>
 <script>
-const APP_VERSION = "VER 2.2";
+const APP_VERSION = "VER 3.0";
 const QR_IMG = "/qr.jpg";
 const ACCOUNT = { bank: "카카오뱅크", number: "3333-35-7486430", holder: "김소연" };
 const MENU = [
@@ -715,6 +728,8 @@ let autoPrintPrimed = false;
 let autoPrintEnabled = true;
 
 async function loadOrders(){
+// 편집 모달이 열려있으면 화면 갱신을 미룸 (편집 중 데이터 어긋남 방지)
+if(editState){ return; }
 try{
 const res = await fetch(API);
 const data = await res.json();
@@ -764,6 +779,172 @@ body: JSON.stringify({ id: order.id, status: newStatus })
 });
 }catch(_){}
 loadOrders();
+}
+
+/* ===================== 주문 편집 모달 (카운터/매출 공용) ===================== */
+// editContext: 'counter' 또는 'sales'
+let editState = null; // { order(복제본), context, saleDate }
+
+function recalcTotal(items){
+  return items.reduce((s,it)=> s + (it.price||0)*(it.qty||1), 0);
+}
+
+function openEditOrder(order, context, saleDate){
+  // 원본을 건드리지 않게 깊은 복제
+  editState = {
+    context: context || 'counter',
+    saleDate: saleDate || order.saleDate || null,
+    order: JSON.parse(JSON.stringify(order))
+  };
+  renderEditModal();
+}
+function closeEditModal(){ editState = null; renderEditModal(); }
+
+function priceOf(item, temp, shot){
+  const base = temp==='hot' ? item.hot : temp==='ice' ? item.ice : item.single;
+  return (base||0) + (shot ? SHOT_PRICE : 0);
+}
+
+function renderEditModal(){
+  let host = document.getElementById('editModalHost');
+  if(!host){
+    host = document.createElement('div');
+    host.id = 'editModalHost';
+    document.body.appendChild(host);
+  }
+  if(!editState){ host.innerHTML=''; return; }
+
+  const items = editState.order.items || [];
+
+  // 현재 담긴 메뉴
+  const itemsHtml = items.length ? items.map((it,idx)=>`
+    <div class="edit-item">
+      <div class="edit-item-name">${it.name}${optLabel(it.temp,it.shot)?` <span style="color:var(--ink-soft);font-size:12px;">(${optLabel(it.temp,it.shot)})</span>`:''}<br><span style="font-size:12px;color:var(--ink-soft);">${fmt((it.price||0)*(it.qty||1))}원</span></div>
+      <div class="edit-shot-ctrl">
+        <div class="edit-mini" data-eminus="${idx}">−</div>
+        <div style="font-family:'Jua',sans-serif;min-width:20px;text-align:center;">${it.qty||1}</div>
+        <div class="edit-mini" data-eplus="${idx}">+</div>
+        <span style="color:var(--danger);font-size:12px;margin-left:6px;cursor:pointer;" data-eremove="${idx}">삭제</span>
+      </div>
+    </div>
+  `).join('') : `<div style="text-align:center;color:var(--ink-soft);padding:16px;">담긴 메뉴가 없어요</div>`;
+
+  // 새 메뉴 추가 그리드
+  let gridHtml = '';
+  MENU.forEach(sec=>{
+    gridHtml += `<div style="grid-column:1/-1;font-family:'Jua',sans-serif;font-size:12px;color:var(--sage-deep);margin-top:8px;">${sec.cat}</div>`;
+    sec.items.forEach(it=>{
+      const hasTemp = it.hot && it.ice;
+      const canShot = SHOT_CATS.includes(sec.cat);
+      const st = editState._new && editState._new[it.id] ? editState._new[it.id] : { temp: it.hot?'hot':(it.ice?'ice':null), shot:false };
+      gridHtml += `<div class="edit-menu-cell">
+        <div class="edit-menu-title">${it.name}</div>
+        ${hasTemp ? `<div class="edit-temp-row">
+          <div class="edit-temp-btn ${st.temp==='hot'?'active':''}" data-ntemp="${it.id}" data-tv="hot">HOT</div>
+          <div class="edit-temp-btn ${st.temp==='ice'?'active':''}" data-ntemp="${it.id}" data-tv="ice">ICE</div>
+        </div>` : ''}
+        ${canShot ? `<div class="edit-shot-row"><span>샷추가</span>
+          <div class="edit-shot-ctrl">
+            <div class="edit-mini" data-nshot="${it.id}" data-sv="0">−</div>
+            <span style="min-width:14px;text-align:center;">${st.shot?'1':'0'}</span>
+            <div class="edit-mini" data-nshot="${it.id}" data-sv="1">+</div>
+          </div></div>` : ''}
+        <button class="edit-add-btn" data-nadd="${it.id}">담기</button>
+      </div>`;
+    });
+  });
+
+  const total = recalcTotal(items);
+
+  host.innerHTML = `
+  <div class="overlay center" id="editOverlay">
+    <div class="sheet" style="max-height:90vh;border-radius:20px;max-width:460px;margin:0 16px;">
+      <div class="display" style="font-size:18px;margin-bottom:4px;">${editState.order.number}번 주문 수정</div>
+      <div style="font-size:12px;color:var(--ink-soft);margin-bottom:10px;">담긴 메뉴</div>
+      ${itemsHtml}
+      <div class="total-row" style="font-size:16px;"><span>합계</span><span>${fmt(total)}원</span></div>
+      <div style="font-size:12px;color:var(--ink-soft);margin:14px 0 4px;">메뉴 추가</div>
+      <div class="edit-grid">${gridHtml}</div>
+      <button class="primary-btn" style="margin-top:16px;" id="editSaveBtn">저장</button>
+      <button class="ghost-btn" style="margin-top:10px;" id="editCancelBtn">취소</button>
+    </div>
+  </div>`;
+
+  // 이벤트
+  const ov = document.getElementById('editOverlay');
+  ov.onclick = (e)=>{ if(e.target.id==='editOverlay') closeEditModal(); };
+
+  host.querySelectorAll('[data-eminus]').forEach(b=>b.onclick=()=>{
+    const i=+b.dataset.eminus; if(items[i].qty>1) items[i].qty--; renderEditModal();
+  });
+  host.querySelectorAll('[data-eplus]').forEach(b=>b.onclick=()=>{
+    const i=+b.dataset.eplus; items[i].qty=(items[i].qty||1)+1; renderEditModal();
+  });
+  host.querySelectorAll('[data-eremove]').forEach(b=>b.onclick=()=>{
+    const i=+b.dataset.eremove; items.splice(i,1); renderEditModal();
+  });
+
+  // 새 메뉴 옵션 상태
+  if(!editState._new) editState._new = {};
+  host.querySelectorAll('[data-ntemp]').forEach(b=>b.onclick=()=>{
+    const id=b.dataset.ntemp; const it=MENU.flatMap(s=>s.items).find(x=>x.id===id);
+    if(!editState._new[id]) editState._new[id]={ temp:it.hot?'hot':'ice', shot:false };
+    editState._new[id].temp=b.dataset.tv; renderEditModal();
+  });
+  host.querySelectorAll('[data-nshot]').forEach(b=>b.onclick=()=>{
+    const id=b.dataset.nshot; const it=MENU.flatMap(s=>s.items).find(x=>x.id===id);
+    if(!editState._new[id]) editState._new[id]={ temp:it.hot?'hot':(it.ice?'ice':null), shot:false };
+    editState._new[id].shot = b.dataset.sv==='1'; renderEditModal();
+  });
+  host.querySelectorAll('[data-nadd]').forEach(b=>b.onclick=()=>{
+    const id=b.dataset.nadd; const it=MENU.flatMap(s=>s.items).find(x=>x.id===id);
+    const sec=MENU.find(s=>s.items.some(x=>x.id===id));
+    const st = editState._new[id] || { temp: it.hot?'hot':(it.ice?'ice':null), shot:false };
+    const canShot = SHOT_CATS.includes(sec.cat);
+    const shot = canShot && st.shot;
+    const price = priceOf(it, st.temp, shot);
+    const key = id+'-'+(st.temp||'single')+(shot?'-shot':'');
+    const exist = items.find(x=> (x.id===id && x.temp===st.temp && x.shot===shot));
+    if(exist){ exist.qty=(exist.qty||1)+1; }
+    else { items.push({ id:it.id, name:it.name, temp:st.temp, shot:!!shot, price, qty:1 }); }
+    renderEditModal();
+  });
+
+  document.getElementById('editCancelBtn').onclick = closeEditModal;
+  document.getElementById('editSaveBtn').onclick = saveEditOrder;
+}
+
+async function saveEditOrder(){
+  if(!editState) return;
+  const items = editState.order.items || [];
+  if(items.length===0){
+    alert('메뉴가 최소 1개는 있어야 해요. 주문을 없애려면 삭제 버튼을 사용하세요.');
+    return;
+  }
+  const total = recalcTotal(items);
+  const btn = document.getElementById('editSaveBtn');
+  if(btn) btn.textContent='저장 중...';
+  try{
+    if(editState.context==='sales'){
+      await fetch(SALES_API, {
+        method:'PUT',
+        headers:{ 'Content-Type':'application/json' },
+        body: JSON.stringify({ saleDate: editState.saleDate, id: editState.order.id, items, total })
+      });
+    } else {
+      await fetch(API, {
+        method:'PUT',
+        headers:{ 'Content-Type':'application/json' },
+        body: JSON.stringify({ id: editState.order.id, items, total })
+      });
+    }
+    const ctx = editState.context;
+    closeEditModal();
+    if(ctx==='sales') loadSales(); else loadOrders();
+  }catch(e){
+    alert('저장 실패. 다시 시도해주세요.');
+    if(btn) btn.textContent='저장';
+  }
 }
 
 // ===================== 영수증 출력 =====================
@@ -819,8 +1000,9 @@ const listHtml = filtered.length ? filtered.map(o=>`
 <div class="order-total">${fmt(o.total)}원</div>
 <div style="display:flex;gap:8px;flex-wrap:wrap;">
 <button class="ghost-btn" style="width:auto;padding:8px 16px;" data-printid="${o.id}">재출력</button>
+<button class="ghost-btn" style="width:auto;padding:8px 16px;color:var(--sage-deep);border-color:var(--sage-deep);" data-editid="${o.id}">수정</button>
 <button class="ghost-btn" style="width:auto;padding:8px 16px;" data-id="${o.id}">${o.status==='pending' ? '완료 처리' : '대기로 되돌리기'}</button>
-${o.status==='done' ? `<button class="ghost-btn" style="width:auto;padding:8px 16px;color:var(--danger);border-color:var(--danger);" data-delid="${o.id}">삭제</button>` : ''}
+<button class="ghost-btn" style="width:auto;padding:8px 16px;color:var(--danger);border-color:var(--danger);" data-delid="${o.id}">삭제</button>
 </div>
 </div>
 </div>
@@ -867,6 +1049,12 @@ document.querySelectorAll('.order-card button[data-printid]').forEach(b=>{
 b.onclick = ()=>{
 const o = counterOrders.find(x=>x.id===b.dataset.printid);
 if(o) printReceipt(o, true);
+};
+});
+document.querySelectorAll('.order-card button[data-editid]').forEach(b=>{
+b.onclick = ()=>{
+const o = counterOrders.find(x=>x.id===b.dataset.editid);
+if(o) openEditOrder(o);
 };
 });
 }
@@ -964,7 +1152,7 @@ function groupDatesByMonth(dates){
   return months;
 }
 
-function salesDetailHtml(records){
+function salesDetailHtml(records, saleDate, showOrders){
   const { byMenu, total, count } = aggregateItems(records);
   const cats = groupByCat(byMenu);
   const { totalCost, hasCost } = calcCost(byMenu);
@@ -989,7 +1177,32 @@ function salesDetailHtml(records){
   }
   box += `</div>`;
 
-  return box + `<div class="sales-card">${html}</div>`;
+  let out = box + `<div class="sales-card">${html}</div>`;
+
+  // 개별 주문 내역 (주별 상세에서만)
+  if(showOrders){
+    const sorted = records.slice().sort((a,b)=> (a.completedAt||a.createdAt||0)-(b.completedAt||b.createdAt||0));
+    let cards = `<div style="font-size:12px;color:var(--ink-soft);margin:16px 20px 4px;">주문 내역 (${sorted.length}건)</div>`;
+    cards += sorted.map(o=>`
+      <div class="order-card">
+        <div class="order-top">
+          <div class="order-no">${o.number}번</div>
+          <div class="order-time">${timeStr(o.completedAt||o.createdAt)}</div>
+        </div>
+        <div class="order-items">${(o.items||[]).map(it=>`${it.name}${optLabel(it.temp,it.shot)?' ('+optLabel(it.temp,it.shot)+')':''} ×${it.qty}`).join('<br/>')}</div>
+        <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;">
+          <div class="order-total">${fmt(o.total)}원 ${o.cash?'<span style="color:var(--apricot-deep);font-size:12px;">·현금</span>':''} ${o.coupon?'<span style="color:var(--sage-deep);font-size:12px;">·쿠폰</span>':''}</div>
+          <div style="display:flex;gap:8px;flex-wrap:wrap;">
+            <button class="ghost-btn" style="width:auto;padding:8px 16px;color:var(--sage-deep);border-color:var(--sage-deep);" data-seditid="${o.id}" data-sdate="${saleDate}">수정</button>
+            <button class="ghost-btn" style="width:auto;padding:8px 16px;color:var(--danger);border-color:var(--danger);" data-sdelid="${o.id}" data-sdate="${saleDate}">삭제</button>
+          </div>
+        </div>
+      </div>
+    `).join('');
+    out += cards;
+  }
+
+  return out;
 }
 
 function renderSales(){
@@ -1018,7 +1231,7 @@ function renderSales(){
           <span class="amt">${fmt(total)}원 ›</span>
         </div>`;
         if(openDate===d){
-          body += salesDetailHtml(recs);
+          body += salesDetailHtml(recs, d, true);
         }
       });
     }
@@ -1040,7 +1253,7 @@ function renderSales(){
           <span class="amt">${fmt(total)}원 ›</span>
         </div>`;
         if(openDate===('M'+m)){
-          body += salesDetailHtml(recs);
+          body += salesDetailHtml(recs, null, false);
         }
       });
     }
@@ -1082,6 +1295,31 @@ function renderSales(){
   });
   document.querySelectorAll('.sales-date-btn[data-month]').forEach(b=>{
     b.onclick = ()=>{ const k='M'+b.dataset.month; openDate = (openDate===k? null : k); renderSales(); };
+  });
+  // 매출 내역 개별 주문 수정
+  document.querySelectorAll('[data-seditid]').forEach(b=>{
+    b.onclick = ()=>{
+      const d = b.dataset.sdate;
+      const rec = (salesData.salesByDate[d]||[]).find(x=>x.id===b.dataset.seditid);
+      if(rec) openEditOrder(rec, 'sales', d);
+    };
+  });
+  // 매출 내역 개별 주문 삭제 (경고창)
+  document.querySelectorAll('[data-sdelid]').forEach(b=>{
+    b.onclick = async ()=>{
+      const d = b.dataset.sdate;
+      const rec = (salesData.salesByDate[d]||[]).find(x=>x.id===b.dataset.sdelid);
+      if(!rec) return;
+      if(!confirm(rec.number+'번 주문을 매출에서 삭제할까요? 되돌릴 수 없어요.')) return;
+      try{
+        await fetch(SALES_API, {
+          method:'DELETE',
+          headers:{ 'Content-Type':'application/json' },
+          body: JSON.stringify({ saleDate: d, id: rec.id })
+        });
+      }catch(_){}
+      loadSales();
+    };
   });
   document.querySelectorAll('.cost-input[data-cost]').forEach(inp=>{
     inp.oninput = (e)=>{
