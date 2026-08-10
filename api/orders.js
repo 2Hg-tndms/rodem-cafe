@@ -1,14 +1,16 @@
 const { Redis } = require('@upstash/redis');
-
 const redis = new Redis({
   url: process.env.KV_REST_API_URL,
   token: process.env.KV_REST_API_TOKEN,
 });
-
 function uid() {
   return Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
 }
-
+// 한국 시간(KST) 기준 날짜 문자열(YYYY-MM-DD) 반환
+function kstDateStr(ts) {
+  const d = new Date(ts + 9 * 60 * 60 * 1000); // UTC+9
+  return d.toISOString().slice(0, 10);
+}
 module.exports = async (req, res) => {
   try {
     if (req.method === 'GET') {
@@ -17,13 +19,11 @@ module.exports = async (req, res) => {
       orders.sort((a, b) => b.createdAt - a.createdAt);
       return res.status(200).json({ orders });
     }
-
     if (req.method === 'POST') {
       const body = req.body;
       if (!body || !body.name || !Array.isArray(body.items) || body.items.length === 0) {
         return res.status(400).json({ error: 'invalid order' });
       }
-
       let n = 1;
       let claimed = false;
       while (!claimed) {
@@ -31,22 +31,46 @@ module.exports = async (req, res) => {
         if (result === 'OK') claimed = true;
         else n++;
       }
-
+      const now = Date.now();
       const order = {
         id: uid(),
         number: n,
         name: body.name,
+        bell: body.bell || body.name,
         items: body.items,
         total: body.total,
         cash: !!body.cash,
         coupon: !!body.coupon,
         status: 'pending',
-        createdAt: Date.now()
+        createdAt: now
       };
       await redis.hset('orders', { [order.id]: JSON.stringify(order) });
+
+      // ===== 판매 원장 기록 (지워지지 않음) =====
+      // 카운터에서 주문을 삭제해도 이 기록은 남아 매출 집계에 사용됨
+      try {
+        const dateStr = kstDateStr(now);
+        const saleRecord = {
+          id: order.id,
+          number: order.number,
+          bell: order.bell,
+          items: order.items,
+          total: order.total,
+          cash: order.cash,
+          coupon: order.coupon,
+          createdAt: now
+        };
+        // 날짜별 리스트에 추가
+        await redis.rpush('sales:' + dateStr, JSON.stringify(saleRecord));
+        // 판매가 있었던 날짜 목록을 set으로 관리(중복 자동 제거)
+        await redis.sadd('sales:dates', dateStr);
+      } catch (logErr) {
+        // 원장 기록 실패해도 주문 자체는 정상 처리 (매출만 누락)
+        console.error('sales log failed:', logErr);
+      }
+
       return res.status(200).json({ order });
     }
-
     if (req.method === 'PUT') {
       const body = req.body;
       if (!body || !body.id) {
@@ -61,7 +85,6 @@ module.exports = async (req, res) => {
       await redis.hset('orders', { [body.id]: JSON.stringify(existing) });
       return res.status(200).json({ order: existing });
     }
-
     if (req.method === 'DELETE') {
       const body = req.body;
       if (!body || !body.id) {
@@ -77,7 +100,6 @@ module.exports = async (req, res) => {
       }
       return res.status(200).json({ ok: true });
     }
-
     return res.status(405).json({ error: 'method not allowed' });
   } catch (err) {
     return res.status(500).json({ error: String((err && err.message) || err) });
