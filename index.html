@@ -219,6 +219,7 @@ margin:10px 20px;padding:16px;cursor:pointer;
 .sales-date-btn .amt{font-family:'Jua',sans-serif;font-size:16px;color:var(--brown);}
 .sales-row{display:flex;justify-content:space-between;padding:7px 0;border-bottom:1px solid var(--line);font-size:14px;}
 .sales-row.head{font-family:'Jua',sans-serif;color:var(--sage-deep);border-bottom:2px solid var(--line);}
+.sales-row.menu-sum{background:var(--cream);border-radius:8px;margin:2px 0;padding-left:4px;}
 .sales-row .q{width:60px;text-align:right;color:var(--ink-soft);}
 .sales-row .a{width:90px;text-align:right;font-family:'Jua',sans-serif;}
 .sales-total-box{background:var(--ink);color:var(--cream);border-radius:14px;padding:16px;margin:12px 20px;}
@@ -261,7 +262,7 @@ background:var(--paper);font-family:'Jua',sans-serif;font-size:20px;cursor:point
 <div id="app"></div>
 <div class="version-badge" id="versionBadge"></div>
 <script>
-const APP_VERSION = "VER 3.1";
+const APP_VERSION = "VER 3.2";
 const QR_IMG = "/qr.jpg";
 const ACCOUNT = { bank: "카카오뱅크", number: "3333-35-7486430", holder: "김소연" };
 const MENU = [
@@ -1095,6 +1096,7 @@ let salesView = 'week';    // week | month | cost
 let salesCosts = {};       // 편집 중인 원가
 let openDate = null;       // 상세 펼친 날짜/월 키
 let ordersExpanded = false; // 주문 내역 아코디언 펼침 여부
+let collapsedMenus = {};   // 옵션 접힌 메뉴 { baseName: true }. 기본은 펼침
 
 async function loadSales(){
   try{
@@ -1186,10 +1188,37 @@ function salesDetailHtml(records, saleDate, showOrders){
   CAT_ORDER.forEach(cat=>{
     if(!cats[cat]) return;
     html += `<div class="sales-row head"><span>${cat}</span><span class="q">수량</span><span class="a">금액</span></div>`;
-    Object.keys(cats[cat].items).forEach(nm=>{
-      const m = cats[cat].items[nm];
-      html += `<div class="sales-row"><span>${m.label}</span><span class="q">${m.qty}</span><span class="a">${fmt(m.amount)}</span></div>`;
+
+    // 이 카테고리 안에서 메뉴 원본이름(baseName)으로 다시 묶기
+    const byBase = {};
+    const baseOrder = [];
+    Object.keys(cats[cat].items).forEach(key=>{
+      const m = cats[cat].items[key];
+      if(!byBase[m.baseName]){ byBase[m.baseName] = []; baseOrder.push(m.baseName); }
+      byBase[m.baseName].push(m);
     });
+
+    baseOrder.forEach(base=>{
+      const variants = byBase[base];
+      if(variants.length <= 1){
+        // 옵션이 하나뿐이면 그냥 한 줄
+        const m = variants[0];
+        html += `<div class="sales-row"><span>${m.label}</span><span class="q">${m.qty}</span><span class="a">${fmt(m.amount)}</span></div>`;
+      } else {
+        // 옵션 2개 이상: 대표 합계 줄(펼침 토글) + 옵션별 상세
+        const sumQty = variants.reduce((s,v)=>s+v.qty,0);
+        const sumAmt = variants.reduce((s,v)=>s+v.amount,0);
+        const collapsed = !!collapsedMenus[base];
+        html += `<div class="sales-row menu-sum" data-menutoggle="${base}" style="cursor:pointer;font-family:'Jua',sans-serif;">
+          <span>${collapsed?'▶':'▼'} ${base}</span><span class="q">${sumQty}</span><span class="a">${fmt(sumAmt)}</span></div>`;
+        if(!collapsed){
+          variants.forEach(m=>{
+            html += `<div class="sales-row" style="padding-left:16px;color:var(--ink-soft);"><span>${m.label}</span><span class="q">${m.qty}</span><span class="a">${fmt(m.amount)}</span></div>`;
+          });
+        }
+      }
+    });
+
     html += `<div class="sales-row" style="color:var(--sage-deep);"><span>${cat} 소계</span><span class="q">${cats[cat].qty}</span><span class="a">${fmt(cats[cat].amount)}</span></div>`;
   });
 
@@ -1328,6 +1357,15 @@ function renderSales(){
   });
   const ordersToggle = document.getElementById('ordersToggle');
   if(ordersToggle) ordersToggle.onclick = ()=>{ ordersExpanded = !ordersExpanded; renderSales(); };
+  // 메뉴 옵션 펼침/접힘
+  document.querySelectorAll('[data-menutoggle]').forEach(b=>{
+    b.onclick = ()=>{
+      const base = b.dataset.menutoggle;
+      if(collapsedMenus[base]) delete collapsedMenus[base];
+      else collapsedMenus[base] = true;
+      renderSales();
+    };
+  });
   // 매출 내역 개별 주문 수정
   document.querySelectorAll('[data-seditid]').forEach(b=>{
     b.onclick = ()=>{
