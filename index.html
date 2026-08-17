@@ -207,7 +207,12 @@ font-size:10px;color:#B7AE9C;font-family:'Gowun Dodum',sans-serif;
 letter-spacing:0.5px;pointer-events:none;user-select:none;
 }
 .sales-wrap{max-width:640px;margin:0 auto;padding:0 0 60px;}
-.sales-header{background:var(--ink);color:var(--cream);padding:20px;position:sticky;top:0;z-index:10;}
+.hamburger{cursor:pointer;font-size:22px;line-height:1;padding:4px 8px;user-select:none;-webkit-tap-highlight-color:transparent;}
+.nav-menu{position:fixed;inset:0;background:rgba(34,30,25,0.5);z-index:60;display:flex;align-items:flex-start;justify-content:flex-end;}
+.nav-menu-box{background:var(--cream);margin:56px 16px 0;border-radius:16px;padding:10px;min-width:180px;box-shadow:0 8px 24px rgba(0,0,0,0.25);}
+.nav-item{padding:14px 16px;font-family:'Jua',sans-serif;font-size:15px;border-radius:10px;cursor:pointer;display:flex;align-items:center;gap:8px;}
+.nav-item:hover{background:var(--paper);}
+.nav-item.active{background:var(--ink);color:var(--cream);}.sales-header{background:var(--ink);color:var(--cream);padding:20px;position:sticky;top:0;z-index:10;}
 .sales-tabs{display:flex;gap:8px;padding:14px 20px 0;}
 .sales-card{background:var(--paper);border:1.5px solid var(--line);border-radius:16px;margin:12px 20px;padding:16px;}
 .sales-date-btn{
@@ -262,7 +267,7 @@ background:var(--paper);font-family:'Jua',sans-serif;font-size:20px;cursor:point
 <div id="app"></div>
 <div class="version-badge" id="versionBadge"></div>
 <script>
-const APP_VERSION = "VER 3.2";
+const APP_VERSION = "VER 3.3";
 const QR_IMG = "/qr.jpg";
 const ACCOUNT = { bank: "카카오뱅크", number: "3333-35-7486430", holder: "김소연" };
 const MENU = [
@@ -389,6 +394,8 @@ let lastOrder = null;
 let submitting = false;
 const SHOT_PRICE = 500;
 const SHOT_CATS = ['COFFEE','NON COFFEE','TEA'];
+let logoClicks = 0;
+let logoClickTimer = null;
 
 function cartCount(){ return cart.reduce((s,c)=>s+c.qty,0); }
 function cartTotal(){ return cart.reduce((s,c)=>s+c.qty*c.price,0); }
@@ -434,7 +441,7 @@ return `<div class="menu-card" data-item="${it.id}">
 }).join('');
 return `
 <div class="header">
-<div class="brand-row">${starIcon(16,'#7C8F63')}<div class="display brand-title">로뎀카페</div>${starIcon(16,'#EE9457')}</div>
+<div class="brand-row">${starIcon(16,'#7C8F63')}<div class="display brand-title" id="brandLogo">로뎀카페</div>${starIcon(16,'#EE9457')}</div>
 <div class="brand-sub">RODEM CAFE · MOBILE ORDER</div>
 </div>
 <div class="tabs">${tabsHtml}</div>
@@ -577,6 +584,16 @@ app.innerHTML = html;
 attachHandlers();
 }
 function attachHandlers(){
+const brandLogo = document.getElementById('brandLogo');
+if(brandLogo) brandLogo.onclick = ()=>{
+logoClicks++;
+clearTimeout(logoClickTimer);
+logoClickTimer = setTimeout(()=>{ logoClicks = 0; }, 1500);
+if(logoClicks >= 5){
+logoClicks = 0;
+location.hash = '#counter';
+}
+};
 document.querySelectorAll('.tab-btn').forEach(b=>{
 b.onclick = ()=>{ activeCat = b.dataset.cat; render(); };
 });
@@ -1012,9 +1029,12 @@ app.innerHTML = `
 <div class="counter-wrap">
 <div class="counter-header">
 <div style="display:flex;justify-content:space-between;align-items:center;">
+<div style="display:flex;align-items:center;gap:8px;">
+<div class="hamburger" id="counterHamburger">≡</div>
 <div>
 <div class="display" style="font-size:22px;">로뎀카페 · 카운터</div>
 <div style="font-size:12px;opacity:0.8;margin-top:2px;">대기중인 주문 ${pendingCount}건</div>
+</div>
 </div>
 <div style="display:flex;gap:8px;align-items:center;">
 <div id="resetNumBtn" style="cursor:pointer;font-size:12px;padding:8px 12px;border-radius:10px;border:2px solid var(--cream);">
@@ -1039,6 +1059,8 @@ b.onclick = ()=>{ counterFilter=b.dataset.f; renderCounter(); };
 });
 const autoBtn = document.getElementById('autoPrintToggle');
 if(autoBtn) autoBtn.onclick = ()=>{ autoPrintEnabled = !autoPrintEnabled; renderCounter(); };
+const counterHam = document.getElementById('counterHamburger');
+if(counterHam) counterHam.onclick = ()=> toggleNavMenu('counter');
 const resetBtn = document.getElementById('resetNumBtn');
 if(resetBtn) resetBtn.onclick = async ()=>{
 if(!confirm('주문번호를 1번부터 다시 시작할까요? (진행 중인 주문 목록은 그대로예요)')) return;
@@ -1338,14 +1360,21 @@ function renderSales(){
 
   app.innerHTML = `<div class="sales-wrap">
     <div class="sales-header">
+      <div style="display:flex;align-items:center;gap:8px;">
+      <div class="hamburger" id="salesHamburger">≡</div>
+      <div>
       <div class="display" style="font-size:22px;">로뎀카페 · 매출</div>
       <div style="font-size:12px;opacity:0.8;margin-top:2px;">일요일 판매 기록</div>
+      </div>
+      </div>
     </div>
     ${tabHtml}
     ${body}
   </div>`;
 
   // 이벤트
+  const salesHam = document.getElementById('salesHamburger');
+  if(salesHam) salesHam.onclick = ()=> toggleNavMenu('sales');
   document.querySelectorAll('.ctab[data-sv]').forEach(b=>{
     b.onclick = ()=>{ salesView=b.dataset.sv; openDate=null; renderSales(); };
   });
@@ -1415,6 +1444,42 @@ function renderSales(){
       saveCostBtn.textContent = '원가 저장';
     }
   };
+}
+
+/* ===================== 화면 전환 햄버거 메뉴 ===================== */
+let navMenuOpen = false;
+function renderNavMenu(current){
+  let host = document.getElementById('navMenuHost');
+  if(!host){
+    host = document.createElement('div');
+    host.id = 'navMenuHost';
+    document.body.appendChild(host);
+  }
+  if(!navMenuOpen){ host.innerHTML=''; return; }
+  host.innerHTML = `
+    <div class="nav-menu" id="navMenuOverlay">
+      <div class="nav-menu-box">
+        <div class="nav-item ${current==='counter'?'active':''}" data-nav="counter">🧾 카운터</div>
+        <div class="nav-item ${current==='sales'?'active':''}" data-nav="sales">📊 매출</div>
+      </div>
+    </div>`;
+  document.getElementById('navMenuOverlay').onclick = (e)=>{
+    if(e.target.id==='navMenuOverlay'){ navMenuOpen=false; renderNavMenu(current); }
+  };
+  host.querySelectorAll('[data-nav]').forEach(b=>{
+    b.onclick = ()=>{
+      const dest = b.dataset.nav;
+      navMenuOpen = false;
+      renderNavMenu(current);
+      if(dest !== current){
+        location.hash = dest==='counter' ? '#counter' : '#sales';
+      }
+    };
+  });
+}
+function toggleNavMenu(current){
+  navMenuOpen = !navMenuOpen;
+  renderNavMenu(current);
 }
 
 function boot(){
