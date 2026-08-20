@@ -1040,17 +1040,19 @@ app.innerHTML = `
 <div class="display" style="font-size:22px;">로뎀카페 · 카운터</div>
 <div style="font-size:12px;opacity:0.8;margin-top:2px;">대기중인 주문 ${pendingCount}건</div>
 </div>
-<div style="display:flex;gap:8px;align-items:center;">
-<div id="openToggle" style="cursor:pointer;font-size:13px;font-family:'Jua',sans-serif;padding:8px 14px;border-radius:10px;border:2px solid var(--cream);${cafeIsOpen?'background:var(--sage);border-color:var(--sage);':'background:var(--danger);border-color:var(--danger);'}">
-${cafeIsOpen?'🟢 영업중':'🔴 마감'}
+<div style="display:flex;gap:8px;align-items:stretch;">
+<div id="openToggle" style="cursor:pointer;font-family:'Jua',sans-serif;font-size:15px;padding:0 18px;border-radius:12px;border:2px solid var(--cream);display:flex;align-items:center;justify-content:center;text-align:center;${cafeIsOpen?'background:var(--sage);border-color:var(--sage);':'background:var(--danger);border-color:var(--danger);'}">
+${cafeIsOpen?'🟢<br>영업중':'🔴<br>마감'}
 </div>
-<div id="resetNumBtn" style="cursor:pointer;font-size:12px;padding:8px 12px;border-radius:10px;border:2px solid var(--cream);">
+<div style="display:flex;flex-direction:column;gap:6px;">
+<div id="resetNumBtn" style="cursor:pointer;font-size:12px;padding:6px 12px;border-radius:10px;border:2px solid var(--cream);text-align:center;">
 번호 초기화
 </div>
-<div id="autoPrintToggle" style="cursor:pointer;font-size:12px;padding:8px 12px;border-radius:10px;border:2px solid var(--cream);${autoPrintEnabled?'background:var(--apricot);border-color:var(--apricot);':'opacity:0.7;'}">
+<div id="autoPrintToggle" style="cursor:pointer;font-size:12px;padding:6px 12px;border-radius:10px;border:2px solid var(--cream);text-align:center;${autoPrintEnabled?'background:var(--apricot);border-color:var(--apricot);':'opacity:0.7;'}">
 자동출력 ${autoPrintEnabled?'ON':'OFF'}
 </div>
-<div class="hamburger" id="counterHamburger">≡</div>
+</div>
+<div class="hamburger" id="counterHamburger" style="display:flex;align-items:center;">≡</div>
 </div>
 </div>
 </div>
