@@ -46,7 +46,9 @@ module.exports = async (req, res) => {
       const all = await redis.hgetall('orders');
       const orders = all ? Object.values(all).map(v => typeof v === 'string' ? JSON.parse(v) : v) : [];
       orders.sort((a, b) => b.createdAt - a.createdAt);
-      return res.status(200).json({ orders });
+      const openRaw = await redis.get('cafe:open');
+      const isOpen = openRaw === 1 || openRaw === '1' || openRaw === true;
+      return res.status(200).json({ orders, isOpen });
     }
 
     if (req.method === 'POST') {
@@ -59,8 +61,20 @@ module.exports = async (req, res) => {
         return res.status(200).json({ ok: true, date: today });
       }
 
+      // 오픈/마감 상태 변경
+      if (body && body.action === 'setOpen') {
+        await redis.set('cafe:open', body.open ? 1 : 0);
+        return res.status(200).json({ ok: true, isOpen: !!body.open });
+      }
+
       if (!body || !body.name || !Array.isArray(body.items) || body.items.length === 0) {
         return res.status(400).json({ error: 'invalid order' });
+      }
+      // 마감 상태면 주문 거부 (고객 화면 우회 대비 서버에서도 차단)
+      const openRaw = await redis.get('cafe:open');
+      const isOpen = openRaw === 1 || openRaw === '1' || openRaw === true;
+      if (!isOpen) {
+        return res.status(403).json({ error: 'closed' });
       }
       const now = Date.now();
       const today = kstDateStr(now);
