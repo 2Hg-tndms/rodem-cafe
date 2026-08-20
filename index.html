@@ -1036,11 +1036,11 @@ app.innerHTML = `
 <div class="counter-wrap">
 <div class="counter-header">
 <div style="display:flex;justify-content:space-between;align-items:center;">
-<div>
-<div class="display" style="font-size:22px;">로뎀카페 · 카운터</div>
-<div style="font-size:12px;opacity:0.8;margin-top:2px;">대기중인 주문 ${pendingCount}건</div>
+<div style="min-width:0;overflow:hidden;">
+<div class="display" style="font-size:17px;white-space:nowrap;">로뎀카페 · 카운터</div>
+<div style="font-size:11px;opacity:0.8;margin-top:2px;white-space:nowrap;">대기중인 주문 ${pendingCount}건</div>
 </div>
-<div style="display:flex;gap:8px;align-items:stretch;">
+<div style="display:flex;gap:8px;align-items:stretch;flex-shrink:0;">
 <div id="openToggle" style="cursor:pointer;font-family:'Jua',sans-serif;font-size:15px;padding:0 18px;border-radius:12px;border:2px solid var(--cream);display:flex;align-items:center;justify-content:center;text-align:center;${cafeIsOpen?'background:var(--sage);border-color:var(--sage);':'background:var(--danger);border-color:var(--danger);'}">
 ${cafeIsOpen?'🟢<br>영업중':'🔴<br>마감'}
 </div>
@@ -1589,15 +1589,15 @@ renderClosedNotice();
 function renderClosedNotice(){
 const app = document.getElementById('app');
 app.innerHTML = `
-<div style="max-width:440px;margin:0 auto;padding:70px 28px;text-align:center;min-height:70vh;display:flex;flex-direction:column;justify-content:center;">
-${mascotSvg()}
+<div style="max-width:440px;margin:0 auto;padding:70px 28px;text-align:center;min-height:70vh;display:flex;flex-direction:column;justify-content:center;align-items:center;">
+<div style="display:flex;justify-content:center;">${mascotSvg()}</div>
 <div class="display" style="font-size:26px;margin-top:20px;color:var(--ink);">잠시 운영을<br>쉬고 있어요</div>
-<div style="background:var(--paper);border:1.5px dashed var(--apricot-deep);border-radius:18px;padding:22px;margin-top:24px;">
+<div style="background:var(--paper);border:1.5px dashed var(--apricot-deep);border-radius:18px;padding:22px;margin-top:24px;width:100%;">
 <div style="font-family:'Jua',sans-serif;font-size:16px;color:var(--brown);margin-bottom:10px;">로뎀카페 운영시간</div>
 <div style="font-size:15px;line-height:1.8;color:var(--ink);">09:30 ~ 10:35<br>13:00 ~ 13:40</div>
 <div style="font-size:13px;color:var(--ink-soft);margin-top:12px;">말씀시간에는 카페 운영을<br>하지 않습니다 🙏</div>
 </div>
-<button class="ghost-btn" style="margin-top:20px;" id="reCheckBtn">새로고침</button>
+<button class="ghost-btn" style="margin-top:20px;width:100%;" id="reCheckBtn">새로고침</button>
 </div>
 `;
 const btn = document.getElementById('reCheckBtn');
