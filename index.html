@@ -267,7 +267,7 @@ background:var(--paper);font-family:'Jua',sans-serif;font-size:20px;cursor:point
 <div id="app"></div>
 <div class="version-badge" id="versionBadge"></div>
 <script>
-const APP_VERSION = "VER 3.3";
+const APP_VERSION = "VER 3.4";
 const QR_IMG = "/qr.jpg";
 const ACCOUNT = { bank: "카카오뱅크", number: "3333-35-7486430", holder: "김소연" };
 const MENU = [
@@ -720,6 +720,11 @@ cash: cashPlanned,
 coupon: couponPlanned
 })
 });
+if(res.status === 403){
+submitting = false;
+renderClosedNotice();
+return;
+}
 if(!res.ok) throw new Error('bad response');
 const data = await res.json();
 lastOrder = data.order;
@@ -744,6 +749,7 @@ const autoPrintedIds = new Set();
 let autoPrintPrimed = false;
 // 자동 출력 켜기/끄기
 let autoPrintEnabled = true;
+let cafeIsOpen = false; // 카운터에서 보는 현재 오픈 상태
 
 async function loadOrders(){
 // 편집 모달이 열려있으면 화면 갱신을 미룸 (편집 중 데이터 어긋남 방지)
@@ -754,6 +760,7 @@ const data = await res.json();
 const orders = data.orders || [];
 orders.sort((a,b)=>b.createdAt-a.createdAt);
 counterOrders = orders;
+cafeIsOpen = data.isOpen === true;
 
 // ===== 새 주문 자동 출력 =====
 if(!autoPrintPrimed){
@@ -1034,6 +1041,9 @@ app.innerHTML = `
 <div style="font-size:12px;opacity:0.8;margin-top:2px;">대기중인 주문 ${pendingCount}건</div>
 </div>
 <div style="display:flex;gap:8px;align-items:center;">
+<div id="openToggle" style="cursor:pointer;font-size:13px;font-family:'Jua',sans-serif;padding:8px 14px;border-radius:10px;border:2px solid var(--cream);${cafeIsOpen?'background:var(--sage);border-color:var(--sage);':'background:var(--danger);border-color:var(--danger);'}">
+${cafeIsOpen?'🟢 영업중':'🔴 마감'}
+</div>
 <div id="resetNumBtn" style="cursor:pointer;font-size:12px;padding:8px 12px;border-radius:10px;border:2px solid var(--cream);">
 번호 초기화
 </div>
@@ -1059,6 +1069,23 @@ const autoBtn = document.getElementById('autoPrintToggle');
 if(autoBtn) autoBtn.onclick = ()=>{ autoPrintEnabled = !autoPrintEnabled; renderCounter(); };
 const counterHam = document.getElementById('counterHamburger');
 if(counterHam) counterHam.onclick = ()=> toggleNavMenu('counter');
+const openBtn = document.getElementById('openToggle');
+if(openBtn) openBtn.onclick = async ()=>{
+const willOpen = !cafeIsOpen;
+const msg = willOpen ? '카페를 오픈할까요? 손님이 주문할 수 있게 됩니다.' : '카페를 마감할까요? 손님 화면에 운영시간 안내가 표시됩니다.';
+if(!confirm(msg)) return;
+try{
+await fetch(API, {
+method:'POST',
+headers:{ 'Content-Type':'application/json' },
+body: JSON.stringify({ action:'setOpen', open: willOpen })
+});
+cafeIsOpen = willOpen;
+renderCounter();
+}catch(e){
+alert('상태 변경 실패. 다시 시도해주세요.');
+}
+};
 const resetBtn = document.getElementById('resetNumBtn');
 if(resetBtn) resetBtn.onclick = async ()=>{
 if(!confirm('주문번호를 1번부터 다시 시작할까요? (진행 중인 주문 목록은 그대로예요)')) return;
@@ -1538,8 +1565,41 @@ alert('비밀번호가 틀렸어요');
 document.getElementById('counterPwBtn').onclick = check;
 document.getElementById('counterPw').addEventListener('keydown', e=>{ if(e.key==='Enter') check(); });
 } else {
-render();
+checkOpenThenRender();
 }
+}
+
+// 고객 화면: 오픈 상태 확인 후, 마감이면 공지창 / 오픈이면 메뉴
+async function checkOpenThenRender(){
+let isOpen = false;
+try{
+const res = await fetch(API);
+const data = await res.json();
+isOpen = data.isOpen === true; // 명시적으로 오픈일 때만 열림. 기본은 마감.
+}catch(e){ isOpen = false; }
+if(isOpen){
+render();
+} else {
+renderClosedNotice();
+}
+}
+
+function renderClosedNotice(){
+const app = document.getElementById('app');
+app.innerHTML = `
+<div style="max-width:440px;margin:0 auto;padding:70px 28px;text-align:center;min-height:70vh;display:flex;flex-direction:column;justify-content:center;">
+${mascotSvg()}
+<div class="display" style="font-size:26px;margin-top:20px;color:var(--ink);">잠시 운영을<br>쉬고 있어요</div>
+<div style="background:var(--paper);border:1.5px dashed var(--apricot-deep);border-radius:18px;padding:22px;margin-top:24px;">
+<div style="font-family:'Jua',sans-serif;font-size:16px;color:var(--brown);margin-bottom:10px;">로뎀카페 운영시간</div>
+<div style="font-size:15px;line-height:1.8;color:var(--ink);">09:30 ~ 10:35<br>13:00 ~ 13:40</div>
+<div style="font-size:13px;color:var(--ink-soft);margin-top:12px;">말씀시간에는 카페 운영을<br>하지 않습니다 🙏</div>
+</div>
+<button class="ghost-btn" style="margin-top:20px;" id="reCheckBtn">새로고침</button>
+</div>
+`;
+const btn = document.getElementById('reCheckBtn');
+if(btn) btn.onclick = ()=> checkOpenThenRender();
 }
 boot();
 window.addEventListener('hashchange', ()=>{ location.reload(); });
