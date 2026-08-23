@@ -1572,6 +1572,9 @@ checkOpenThenRender();
 }
 
 // 고객 화면: 오픈 상태 확인 후, 마감이면 공지창 / 오픈이면 메뉴
+let customerIsOpen = null; // 현재 고객화면이 인식한 오픈상태
+let openWatchTimer = null;
+
 async function checkOpenThenRender(){
 let isOpen = false;
 try{
@@ -1579,10 +1582,35 @@ const res = await fetch(API);
 const data = await res.json();
 isOpen = data.isOpen === true; // 명시적으로 오픈일 때만 열림. 기본은 마감.
 }catch(e){ isOpen = false; }
+customerIsOpen = isOpen;
 if(isOpen){
 render();
 } else {
 renderClosedNotice();
+}
+// 주기적으로 오픈상태 감시 시작 (한 번만 등록)
+if(!openWatchTimer){
+openWatchTimer = setInterval(watchOpenState, 5000);
+}
+}
+
+// 카운터에서 오픈/마감이 바뀌면 고객 화면에 자동 반영
+async function watchOpenState(){
+let isOpen = customerIsOpen;
+try{
+const res = await fetch(API);
+const data = await res.json();
+isOpen = data.isOpen === true;
+}catch(e){ return; }
+if(isOpen === customerIsOpen) return; // 변화 없으면 아무것도 안 함
+
+customerIsOpen = isOpen;
+if(!isOpen){
+// 마감으로 바뀜 → 즉시 공지창 (주문 흐름 중이어도 막음)
+renderClosedNotice();
+} else {
+// 오픈으로 바뀜 → 주문 화면으로
+render();
 }
 }
 
