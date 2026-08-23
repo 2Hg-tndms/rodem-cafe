@@ -391,6 +391,7 @@ let bellNo = '';
 let cashPlanned = false;
 let couponPlanned = false;
 let lastOrder = null;
+let autoReturnTimer = null;
 let submitting = false;
 const SHOT_PRICE = 500;
 const SHOT_CATS = ['COFFEE','NON COFFEE','TEA'];
@@ -582,6 +583,11 @@ html += renderOptionSheet();
 html += renderCartDrawer();
 app.innerHTML = html;
 attachHandlers();
+// 완료 화면이면 2초 뒤 자동으로 메뉴로 복귀
+if(stage==='done'){
+if(autoReturnTimer) clearTimeout(autoReturnTimer);
+autoReturnTimer = setTimeout(()=>{ resetToMenu(); }, 2000);
+}
 }
 function attachHandlers(){
 const brandLogo = document.getElementById('brandLogo');
@@ -693,9 +699,12 @@ if(backBtn) backBtn.onclick = ()=>{ stage='menu'; showCartDrawer=true; render();
 const confirmBtn = document.getElementById('confirmPayBtn');
 if(confirmBtn) confirmBtn.onclick = submitOrder;
 const newOrderBtn = document.getElementById('newOrderBtn');
-if(newOrderBtn) newOrderBtn.onclick = ()=>{
+if(newOrderBtn) newOrderBtn.onclick = ()=>{ resetToMenu(); };
+}
+
+function resetToMenu(){
+if(autoReturnTimer){ clearTimeout(autoReturnTimer); autoReturnTimer = null; }
 cart = []; bellNo=''; cashPlanned=false; couponPlanned=false; stage='menu'; lastOrder=null; render();
-};
 }
 
 const API = '/api/orders';
