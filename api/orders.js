@@ -44,7 +44,20 @@ module.exports = async (req, res) => {
   try {
     if (req.method === 'GET') {
       const all = await redis.hgetall('orders');
-      const orders = all ? Object.values(all).map(v => typeof v === 'string' ? JSON.parse(v) : v) : [];
+      let orders = all ? Object.values(all).map(v => typeof v === 'string' ? JSON.parse(v) : v) : [];
+
+      // 하루가 지난 "완료" 주문은 카운터 목록에서 자동으로 정리한다.
+      // 매출 원장(saleslog:날짜)은 건드리지 않으므로 매출 기록은 그대로 남는다.
+      const today = kstDateStr(Date.now());
+      const staleIds = orders
+        .filter(o => o.status === 'done' && kstDateStr(o.completedAt || o.createdAt) !== today)
+        .map(o => o.id);
+      if (staleIds.length > 0) {
+        await redis.hdel('orders', ...staleIds);
+        const staleSet = new Set(staleIds);
+        orders = orders.filter(o => !staleSet.has(o.id));
+      }
+
       orders.sort((a, b) => b.createdAt - a.createdAt);
       const openRaw = await redis.get('cafe:open');
       const isOpen = openRaw === 1 || openRaw === '1' || openRaw === true;
