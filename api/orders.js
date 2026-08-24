@@ -129,7 +129,7 @@ module.exports = async (req, res) => {
           const dateStr = await addToSales(existing);
           existing.saleDate = dateStr;
         } else if (body.status === 'pending') {
-          // 되돌리기: 매출에서 제거
+          // 되돌리기: 매출에서 제거 (실수로 완료 처리한 경우를 되돌리는 용도)
           await removeFromSales(existing);
           existing.status = 'pending';
           delete existing.saleDate;
@@ -148,15 +148,10 @@ module.exports = async (req, res) => {
       if (!body || !body.id) {
         return res.status(400).json({ error: 'missing id' });
       }
-      const existingRaw = await redis.hget('orders', body.id);
+      // 카운터 목록에서만 제거한다.
+      // 완료 처리되어 매출 원장(saleslog:날짜)에 들어간 기록은 그대로 남긴다.
+      // 매출에서 지우려면 매출 화면의 삭제 버튼(/api/sales DELETE)을 사용한다.
       await redis.hdel('orders', body.id);
-      if (existingRaw) {
-        const existing = typeof existingRaw === 'string' ? JSON.parse(existingRaw) : existingRaw;
-        // 완료되어 매출에 있던 주문이면 매출에서도 제거
-        if (existing.saleDate) {
-          await removeFromSales(existing);
-        }
-      }
       return res.status(200).json({ ok: true });
     }
 
