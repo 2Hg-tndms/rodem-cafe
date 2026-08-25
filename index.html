@@ -352,6 +352,12 @@ cursor:pointer;font-family:'Jua',sans-serif;font-size:15px;padding:0 18px;
 border-radius:var(--r-md);border:1px solid transparent;color:#fff;
 display:flex;align-items:center;justify-content:center;text-align:center;line-height:1.25;
 }
+.auto-note{
+display:flex;align-items:center;gap:9px;flex-wrap:wrap;
+margin-top:11px;padding-top:10px;
+border-top:1px solid rgba(248,238,218,.18);
+font-size:11.5px;color:rgba(248,238,218,.78);
+}
 .hamburger{cursor:pointer;font-size:24px;line-height:1;padding:4px 8px;user-select:none;-webkit-tap-highlight-color:transparent;}
 .nav-menu{position:fixed;inset:0;background:rgba(40,24,12,.48);z-index:60;display:flex;align-items:flex-start;justify-content:flex-end;}
 .nav-menu-box{background:var(--parch-lit);margin:60px 16px 0;border-radius:var(--r-lg);padding:10px;min-width:190px;box-shadow:var(--sh-2);border:1px solid var(--row-line);}
@@ -440,7 +446,7 @@ letter-spacing:.5px;pointer-events:none;user-select:none;
 <div id="app"></div>
 <div class="version-badge" id="versionBadge"></div>
 <script>
-const APP_VERSION = "VER 4.5";
+const APP_VERSION = "VER 4.6";
 const QR_IMG = "/qr.jpg";
 const ACCOUNT = { bank: "카카오뱅크", number: "3333-35-7486430", holder: "김소연" };
 const MENU = [
@@ -1005,6 +1011,8 @@ const autoPrintedIds = new Set();
 let autoPrintPrimed = false;
 let autoPrintEnabled = true;
 let cafeIsOpen = false;
+let cafeManual = false;   // 수동 설정이 살아있는지
+let cafeUntil = 0;        // 수동 설정이 풀리는 시각
 
 async function loadOrders(){
 if(editState){ return; }
@@ -1015,6 +1023,8 @@ const orders = data.orders || [];
 orders.sort((a,b)=>b.createdAt-a.createdAt);
 counterOrders = orders;
 cafeIsOpen = data.isOpen === true;
+cafeManual = data.manual === true;
+cafeUntil = data.until || 0;
 
 if(!autoPrintPrimed){
 orders.forEach(o=>autoPrintedIds.add(o.id));
@@ -1293,6 +1303,11 @@ ${cafeIsOpen?'🟢<br>영업중':'🔴<br>마감'}
 <div class="hamburger" id="counterHamburger" style="display:flex;align-items:center;">≡</div>
 </div>
 </div>
+<div class="auto-note">
+${cafeManual
+? `<span>✋ 수동 설정 중 · ${timeStr(cafeUntil)}에 자동으로 돌아갑니다</span><span class="pill" id="autoBackBtn">지금 자동으로</span>`
+: `<span>🕘 자동 운영 중 · 일요일 09:30~10:35, 13:00~13:40</span>`}
+</div>
 </div>
 <div class="staff-tabs">
 <div class="ctab ${counterFilter==='pending'?'active':''}" data-f="pending">대기중</div>
@@ -1312,7 +1327,10 @@ if(counterHam) counterHam.onclick = ()=> toggleNavMenu('counter');
 const openBtn = document.getElementById('openToggle');
 if(openBtn) openBtn.onclick = async ()=>{
 const willOpen = !cafeIsOpen;
-const msg = willOpen ? '카페를 오픈할까요? 손님이 주문할 수 있게 됩니다.' : '카페를 마감할까요? 손님 화면에 운영시간 안내가 표시됩니다.';
+const back = cafeUntil ? timeStr(cafeUntil) : '다음 운영시간';
+const msg = willOpen
+? '지금 바로 오픈할까요?\n('+back+'까지 유지되고 이후 자동 운영으로 돌아갑니다)'
+: '지금 바로 마감할까요?\n('+back+'까지 유지되고 이후 자동 운영으로 돌아갑니다)';
 if(!confirm(msg)) return;
 try{
 await fetch(API, {
@@ -1320,10 +1338,23 @@ method:'POST',
 headers:{ 'Content-Type':'application/json' },
 body: JSON.stringify({ action:'setOpen', open: willOpen })
 });
-cafeIsOpen = willOpen;
-renderCounter();
+loadOrders();
 }catch(e){
 alert('상태 변경 실패. 다시 시도해주세요.');
+}
+};
+const autoBackBtn = document.getElementById('autoBackBtn');
+if(autoBackBtn) autoBackBtn.onclick = async ()=>{
+if(!confirm('수동 설정을 풀고 운영시간대로 자동 운영할까요?')) return;
+try{
+await fetch(API, {
+method:'POST',
+headers:{ 'Content-Type':'application/json' },
+body: JSON.stringify({ action:'clearOverride' })
+});
+loadOrders();
+}catch(e){
+alert('변경 실패. 다시 시도해주세요.');
 }
 };
 const resetBtn = document.getElementById('resetNumBtn');
