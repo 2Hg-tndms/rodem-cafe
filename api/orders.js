@@ -11,6 +11,47 @@ function kstDateStr(ts) {
   const d = new Date(ts + 9 * 60 * 60 * 1000);
   return d.toISOString().slice(0, 10);
 }
+// ===== 운영시간 자동 개폐 =====
+// 일요일 09:30~10:35, 13:00~13:40 (한국시간)
+const KST_OFFSET = 9 * 60 * 60 * 1000;
+const OPEN_WEEKDAY = 0; // 0=일요일
+const OPEN_WINDOWS = [
+  { start: 9 * 60 + 30, end: 10 * 60 + 35 },
+  { start: 13 * 60, end: 13 * 60 + 40 }
+];
+// 한국시간 기준 요일/분 단위 시각
+function kstParts(ts) {
+  const d = new Date(ts + KST_OFFSET);
+  return { day: d.getUTCDay(), min: d.getUTCHours() * 60 + d.getUTCMinutes() };
+}
+// 지금이 운영시간인지 (스케줄 기준)
+function scheduleOpen(ts) {
+  const p = kstParts(ts);
+  if (p.day !== OPEN_WEEKDAY) return false;
+  return OPEN_WINDOWS.some(w => p.min >= w.start && p.min < w.end);
+}
+// 다음으로 상태가 바뀌는 시각 (수동 설정이 풀리는 시점)
+function nextBoundary(ts) {
+  const p = kstParts(ts);
+  const marks = [];
+  OPEN_WINDOWS.forEach(w => { marks.push(w.start); marks.push(w.end); });
+  marks.push(24 * 60); // 자정
+  const next = marks.filter(m => m > p.min).sort((a, b) => a - b)[0];
+  return ts + (next - p.min) * 60 * 1000;
+}
+// 실제 오픈 여부: 수동 설정이 살아있으면 그것, 아니면 스케줄
+async function computeOpenState() {
+  const now = Date.now();
+  const scheduled = scheduleOpen(now);
+  let ov = await redis.get('cafe:override');
+  if (typeof ov === 'string') {
+    try { ov = JSON.parse(ov); } catch (_) { ov = null; }
+  }
+  if (ov && typeof ov.open === 'boolean' && ov.until && now < ov.until) {
+    return { isOpen: ov.open, manual: true, until: ov.until, scheduled };
+  }
+  return { isOpen: scheduled, manual: false, until: nextBoundary(now), scheduled };
+}
 // 완료된 주문을 매출 원장에 기록 (날짜별 해시, 키=주문id)
 async function addToSales(order) {
   const dateStr = order.saleDate || kstDateStr(order.completedAt || Date.now());
@@ -59,9 +100,14 @@ module.exports = async (req, res) => {
       }
 
       orders.sort((a, b) => b.createdAt - a.createdAt);
-      const openRaw = await redis.get('cafe:open');
-      const isOpen = openRaw === 1 || openRaw === '1' || openRaw === true;
-      return res.status(200).json({ orders, isOpen });
+      const state = await computeOpenState();
+      return res.status(200).json({
+        orders,
+        isOpen: state.isOpen,
+        manual: state.manual,
+        until: state.until,
+        scheduled: state.scheduled
+      });
     }
 
     if (req.method === 'POST') {
@@ -74,19 +120,28 @@ module.exports = async (req, res) => {
         return res.status(200).json({ ok: true, date: today });
       }
 
-      // 오픈/마감 상태 변경
+      // 오픈/마감 수동 변경 (다음 운영시간 경계까지만 유지되고 이후 자동으로 복귀)
       if (body && body.action === 'setOpen') {
-        await redis.set('cafe:open', body.open ? 1 : 0);
-        return res.status(200).json({ ok: true, isOpen: !!body.open });
+        const now = Date.now();
+        const until = nextBoundary(now);
+        const ttl = Math.max(60, Math.ceil((until - now) / 1000));
+        await redis.set('cafe:override', JSON.stringify({ open: !!body.open, until }), { ex: ttl });
+        return res.status(200).json({ ok: true, isOpen: !!body.open, manual: true, until });
+      }
+
+      // 수동 설정 해제 → 즉시 자동(스케줄)으로 복귀
+      if (body && body.action === 'clearOverride') {
+        await redis.del('cafe:override');
+        const state = await computeOpenState();
+        return res.status(200).json({ ok: true, isOpen: state.isOpen, manual: false, until: state.until });
       }
 
       if (!body || !body.name || !Array.isArray(body.items) || body.items.length === 0) {
         return res.status(400).json({ error: 'invalid order' });
       }
       // 마감 상태면 주문 거부 (고객 화면 우회 대비 서버에서도 차단)
-      const openRaw = await redis.get('cafe:open');
-      const isOpen = openRaw === 1 || openRaw === '1' || openRaw === true;
-      if (!isOpen) {
+      const state = await computeOpenState();
+      if (!state.isOpen) {
         return res.status(403).json({ error: 'closed' });
       }
       const now = Date.now();
